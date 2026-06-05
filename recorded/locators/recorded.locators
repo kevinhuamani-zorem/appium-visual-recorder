@@ -1,0 +1,17 @@
+# Archivo generado por Appium Visual Recorder
+# formato: nombre_variable:@:selector
+# Selectores soportados:
+#   XPath    : //android.widget.Button[@text="Login"]
+#   Resource : //*[@resource-id="com.app:id/btn_login"]
+#   AccId    : ~accessibility_id
+
+btn_9:@://android.view.View[./android.widget.TextView[@text='9']]
+{btn_9}:@://*[@text="9"]
+intentarlo_despu_s:@://*[@content-desc="Intentarlo después"]
+yapear:@://*[@content-desc="Yapear"]
+permitir:@://*[@text="Permitir"]
+mostrar_saldo:@://*[@text="Mostrar saldo"]
+entendido:@://*[@text="ENTENDIDO"]
+9:@://*[@text="9"]
+ver_todo:@://*[@content-desc="Ver todo"]
+giro_retiro_de_efectivo:@://*[@content-desc="Giro/retiro de efectivo"]

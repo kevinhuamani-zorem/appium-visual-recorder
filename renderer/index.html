@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appium Visual Recorder</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- PANTALLA 1: CONFIGURACION -->
+    <div id="screenConfig" class="screen">
+        <div class="config-container">
+            <div class="config-header">
+                <span class="logo">📱</span>
+                <h1>Appium Visual Recorder</h1>
+                <p class="subtitle">Configuracion del dispositivo</p>
+            </div>
+            <div class="config-body">
+                <div class="config-section">
+                    <label class="field-label">Dispositivo conectado:</label>
+                    <div class="device-row">
+                        <select id="cmbDevices" class="field-select"></select>
+                        <button class="btn btn-dark" id="btnRefreshDevices">🔄</button>
+                    </div>
+                    <div id="lblDeviceInfo" class="device-info"></div>
+                </div>
+                <div class="config-section">
+                    <label class="field-label">Package de la app:</label>
+                    <div class="input-row">
+                        <input type="text" id="txtPackage" class="field-input" placeholder="ej: com.example.app" value="com.yape.qa"/>
+                        <button class="btn btn-dark" id="btnDetectApp">🔍 Detectar</button>
+                    </div>
+                    <label class="field-label">Activity principal:</label>
+                    <input type="text" id="txtActivity" class="field-input" placeholder="ej: .MainActivity" value="com.yape.activity.MainActivity"/>
+                    <label class="field-label">Version Android:</label>
+                    <input type="text" id="txtPlatformVersion" class="field-input" value="16"/>
+                </div>
+                <div class="config-section">
+                    <label class="field-label">APK (opcional):</label>
+                    <input type="text" id="txtApkPath" class="field-input" placeholder="Ruta al .apk"/>
+                </div>
+                <div id="lblConfigStatus" class="config-status"></div>
+                <button class="btn btn-green btn-full btn-start" id="btnStartSession">🚀 INICIAR SESION</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA 2: GRABACION -->
+    <div id="screenRecorder" class="screen" style="display:none">
+        <header class="header">
+            <div class="header-left">
+                <span class="logo">📱</span>
+                <span class="title">Appium Visual Recorder</span>
+                <span id="lblDevice" class="device-badge">Sin dispositivo</span>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-dark-sm" id="btnRefreshScreen">🔄</button>
+                <button class="btn btn-blue" id="btnXmlInspector">🔍 Inspector</button>
+                <button class="btn btn-red-sm" id="btnCloseSession">⏹ Cerrar</button>
+            </div>
+        </header>
+
+        <main class="main">
+            <section class="panel panel-device">
+                <div class="section-title">📺 PANTALLA</div>
+                <div class="device-screen-container">
+                    <img id="imgDevice" class="device-screen" src="" alt="" style="display:none"/>
+                    <div id="devicePlaceholder" class="device-placeholder">Sin captura</div>
+                </div>
+                <button class="btn btn-purple btn-full" id="btnInspect">🖱️ Inspeccionar elemento</button>
+                <div id="lblInspectStatus" class="inspect-status">— Presiona y toca en el dispositivo</div>
+            </section>
+
+            <section class="panel panel-left">
+                <div class="section-title">🔍 SELECTOR</div>
+                <label class="field-label">XPath / Selector:</label>
+                <div class="input-row">
+                    <input type="text" id="txtSelector" class="field-input" placeholder="XPath..."/>
+                    <button class="btn btn-dark" id="btnCopy">📋</button>
+                </div>
+                <label class="field-label">Nombre variable:</label>
+                <input type="text" id="txtVarName" class="field-input" placeholder="ej: btn_login"/>
+                <button class="btn btn-navy btn-full" id="btnVerify">✅ Verificar selector</button>
+                <div id="lblVerifyResult" class="verify-result">— Ingresa un selector</div>
+                <div class="separator"></div>
+                <div class="section-title">⚡ STEP</div>
+                <label class="field-label">Accion:</label>
+                <select id="cmbAction" class="field-select">
+                    <option value="ABRIR_APP">📱 ABRIR APP</option>
+                    <option value="CLICK" selected>👆 CLICK</option>
+                    <option value="ESCRIBIR">✏️ ESCRIBIR</option>
+                    <option value="LIMPIAR">🧹 LIMPIAR</option>
+                    <option value="SCROLL_DOWN">⬇️ SCROLL DOWN</option>
+                    <option value="SCROLL_UP">⬆️ SCROLL UP</option>
+                    <option value="SCROLL_HASTA">🔍 SCROLL HASTA</option>
+                    <option value="SWIPE">👉 SWIPE</option>
+                    <option value="PRESION_LARGA">👇 PRESION LARGA</option>
+                    <option value="VERIFICAR_TEXTO">✅ VERIFICAR TEXTO</option>
+                    <option value="VERIFICAR_EXISTE">👁️ VERIFICAR EXISTE</option>
+                    <option value="VERIFICAR_NO_EXISTE">🚫 VERIFICAR NO EXISTE</option>
+                    <option value="VOLVER">◀️ VOLVER</option>
+                    <option value="ESPERAR">⏳ ESPERAR</option>
+                    <option value="SCREENSHOT">📸 SCREENSHOT</option>
+                </select>
+                <label class="field-label">Valor:</label>
+                <input type="text" id="txtValue" class="field-input" placeholder="texto, segundos..."/>
+                <label class="field-label">Descripcion (opcional):</label>
+                <input type="text" id="txtDesc" class="field-input" placeholder="describe el step..."/>
+                <button class="btn btn-green btn-full btn-execute" id="btnExecute">▶ EJECUTAR Y GUARDAR</button>
+                <div class="separator"></div>
+                <div class="section-title">📄 NOMBRE</div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label class="field-label">Feature:</label>
+                        <input type="text" id="txtFeature" class="field-input" value="Flujo mobile"/>
+                    </div>
+                    <div class="input-group">
+                        <label class="field-label">Scenario:</label>
+                        <input type="text" id="txtScenario" class="field-input" value="Escenario grabado"/>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel panel-right">
+                <div class="steps-header">
+                    <span class="section-title">📋 STEPS</span>
+                    <div class="steps-actions">
+                        <button class="btn btn-red-sm" id="btnDeleteStep">🗑️</button>
+                        <button class="btn btn-dark-sm" id="btnClearSteps">🧹</button>
+                    </div>
+                </div>
+                <ul id="lstSteps" class="steps-list">
+                    <li class="step-empty">Sin steps grabados...</li>
+                </ul>
+                <div class="separator"></div>
+                <div class="section-title">👁️ GHERKIN</div>
+                <textarea id="txtGherkin" class="gherkin-preview" readonly></textarea>
+                <div class="btn-row">
+                    <button class="btn btn-navy btn-half" id="btnPreview">👁️ Preview</button>
+                    <button class="btn btn-green btn-half" id="btnGenerate">💾 GENERAR</button>
+                </div>
+                <div id="lblGenerateResult" class="generate-result"></div>
+            </section>
+        </main>
+
+        <!-- XML HIERARCHY VIEWER -->
+        <div id="xmlModal" class="xml-modal" style="display:none">
+            <div class="xml-modal-content">
+                <div class="xml-modal-header">
+                    <span class="section-title">🔍 XML Hierarchy Viewer</span>
+                    <div class="xml-modal-actions">
+                        <button class="btn btn-blue" id="btnRefreshXml">🔄 Refresh</button>
+                        <button class="btn btn-dark" id="btnCloseXml">✕ Cerrar</button>
+                    </div>
+                </div>
+                <div class="xml-modal-body">
+
+                    <!-- Screenshot interactivo -->
+                    <div class="hier-device">
+                        <div class="section-title" style="margin-bottom:6px">
+                            📱 Click en elemento
+                        </div>
+                        <div class="hier-screen-wrap" id="hierScreenWrap">
+                            <img id="hierImg" class="hier-screen" src="" alt=""/>
+                            <canvas id="hierCanvas" class="hier-canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Arbol XML -->
+                    <div class="hier-tree-panel">
+                        <div class="section-title" style="margin-bottom:6px">🌳 Hierarchy</div>
+                        <div id="hierTree" class="hier-tree">
+                            <span class="hier-hint">Haz click en la imagen</span>
+                        </div>
+                    </div>
+
+                    <!-- Atributos + XPath -->
+                    <div class="hier-attrs-panel">
+                        <div class="section-title" style="margin-bottom:6px">📋 Atributos</div>
+                        <div id="hierAttrs" class="hier-attrs">
+                            <span class="hier-hint">Selecciona un elemento</span>
+                        </div>
+                        <div class="separator" style="margin:8px 0"></div>
+                        <div class="section-title" style="margin-bottom:6px">🎯 XPath sugerido</div>
+                        <div id="hierXpathSuggestions" class="xpath-suggestions"></div>
+                        <label class="field-label" style="margin-top:8px">XPath editable:</label>
+                        <textarea id="txtXpathManual" class="xpath-manual"
+                                  placeholder="//*[@text='Login']"></textarea>
+                        <div class="btn-row" style="margin-top:6px">
+                            <button class="btn btn-navy btn-half" id="btnVerifyXpathManual">✅ Verificar</button>
+                            <button class="btn btn-green btn-half" id="btnUseXpath">⬆️ Usar</button>
+                        </div>
+                        <div id="lblXmlVerify" class="verify-result" style="margin-top:6px">
+                            — Verifica antes de usar
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <footer class="statusbar">
+            <span id="lblStatus">✓ Listo</span>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

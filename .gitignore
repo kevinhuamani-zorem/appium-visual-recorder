@@ -1,0 +1,46 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+dist/
+
+out/
+
+# Appium
+/tmp/appium_source.xml
+/tmp/appium_source_fallback.xml
+/tmp/ui_dump_*.xml
+
+# ADB
+/tmp/window_dump.xml
+
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Screenshots temporales
+*.png
+!renderer/**/*.png
+
+# Yarn
+yarn.lock
+
