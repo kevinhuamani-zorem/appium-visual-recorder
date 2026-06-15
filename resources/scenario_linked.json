@@ -1,0 +1,27 @@
+{
+  "el usuario tiene algo de": [
+    {
+      "action": "CLICK",
+      "variableName": "mostrar_saldo",
+      "selector": "//*[@text=\"Mostrar saldo\"]",
+      "value": "",
+      "description": ""
+    },
+    {
+      "action": "CLICK",
+      "variableName": "iniciar_sesi_n",
+      "selector": "//*[@content-desc=\"Iniciar sesión\"]",
+      "value": "",
+      "description": ""
+    }
+  ],
+  "el usuario se logea": [
+    {
+      "action": "CLICK",
+      "variableName": "9",
+      "selector": "//*[@text=\"9\"]",
+      "value": "",
+      "description": ""
+    }
+  ]
+}

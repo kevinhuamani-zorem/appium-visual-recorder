@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { RecordedStep, toGherkinLine } from './models';
+import { RecordedStep, toGherkinLine } from '../../core/models';
 
 export class FeatureGenerator {
     constructor(

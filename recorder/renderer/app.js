@@ -268,6 +268,77 @@ window.addEventListener('DOMContentLoaded', async () => {
         setConfigStatus('Sesion cerrada', '');
     });
 
+    // ── Chips de selector (inspector físico) ─────────────────────────────────
+    function renderSelectorChips(candidates, suggested) {
+        let chipsWrap = document.getElementById('selectorChips');
+        if (!chipsWrap) {
+            chipsWrap = document.createElement('div');
+            chipsWrap.id = 'selectorChips';
+            chipsWrap.style.cssText =
+                'display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;padding:4px 0';
+            txtSelector.parentNode.insertBefore(chipsWrap, txtSelector.nextSibling);
+        }
+        chipsWrap.innerHTML = '';
+
+        candidates.forEach((c, idx) => {
+            const chip = document.createElement('div');
+            chip.style.cssText =
+                'display:inline-flex;flex-direction:column;gap:2px;padding:5px 9px;' +
+                'border-radius:5px;border:1.5px solid ' + (idx === 0 ? '#7030A0' : '#444') + ';' +
+                'cursor:pointer;background:' + (idx === 0 ? '#3a2a4e' : '#2a2a3e') + ';' +
+                'max-width:320px;';
+
+            const priorityColors = ['#3a9a3a','#4a80d9','#c09040','#888','#666','#555'];
+            const labelEl = document.createElement('span');
+            labelEl.style.cssText = 'font-size:9px;font-weight:700;color:' +
+                (priorityColors[idx] || '#888');
+            labelEl.textContent = (idx === 0 ? '⭐ ' : '') + c.label;
+
+            const valEl = document.createElement('span');
+            valEl.style.cssText =
+                'font-family:monospace;font-size:9.5px;color:' +
+                (idx === 0 ? '#e0b0ff' : '#ccc') +
+                ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px';
+            valEl.textContent = c.selector;
+            valEl.title = c.selector;
+
+            chip.appendChild(labelEl);
+            chip.appendChild(valEl);
+
+            chip.addEventListener('click', () => {
+                // Actualizar selector y variable name
+                txtSelector.value = c.selector;
+                const patterns = [
+                    /@resource-id="[^"]*\/([^"]+)"/,
+                    /@resource-id="([^"]+)"/,
+                    /@content-desc="([^"]+)"/,
+                    /@text="([^"]+)"/,
+                ];
+                for (const re of patterns) {
+                    const m = c.selector.match(re);
+                    if (m) {
+                        txtVarName.value = m[1].toLowerCase()
+                            .replace(/[^a-z0-9]/g, '_')
+                            .replace(/_+/g, '_')
+                            .replace(/^_|_$/g, '');
+                        break;
+                    }
+                }
+                // Resaltar chip activo
+                chipsWrap.querySelectorAll('div').forEach(ch => {
+                    ch.style.borderColor = '#444';
+                    ch.style.background  = '#2a2a3e';
+                    ch.querySelector('span').style.color = '#888';
+                });
+                chip.style.borderColor = '#7030A0';
+                chip.style.background  = '#3a2a4e';
+                labelEl.style.color    = priorityColors[idx] || '#888';
+            });
+
+            chipsWrap.appendChild(chip);
+        });
+    }
+
     btnInspect.addEventListener('click', async () => {
         disableBtn(btnInspect, '⏳ Toca un elemento...');
         setInspect('Toca un elemento en el dispositivo...', 'active');
@@ -277,10 +348,17 @@ window.addEventListener('DOMContentLoaded', async () => {
         enableBtn(btnInspect);
 
         if (result.success) {
+            // Pre-cargar con el candidato P1 (resource-id si existe)
             txtSelector.value = result.xpath;
             txtVarName.value  = result.suggested;
             if (result.screenshot) updateDeviceScreen(result.screenshot);
-            setInspect('✓ XPath: ' + result.xpath, 'ok');
+
+            // Mostrar todos los candidatos como chips clicables
+            if (result.candidates && result.candidates.length > 1) {
+                renderSelectorChips(result.candidates, result.suggested);
+            }
+
+            setInspect('✓ ' + result.candidates.length + ' identificador(es) — elige el mejor', 'ok');
             setStatus('✓ Elemento capturado', '#00CC00');
         } else {
             setInspect('Cancelado o timeout', '');
@@ -383,17 +461,36 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnGenerate.addEventListener('click', async () => {
+        const featureName  = txtFeature.value.trim()  || 'Flujo mobile';
+        const scenarioName = txtScenario.value.trim() || 'Escenario';
+
         disableBtn(btnGenerate, '⏳ Generando...');
-        const r = await api.generateFiles(
-            txtFeature.value.trim() || 'Flujo mobile',
-            txtScenario.value.trim() || 'Escenario'
-        );
-        enableBtn(btnGenerate);
-        if (r.success) {
-            setGenerate('✓ ' + r.featurePath, 'ok');
-            setStatus('✓ Generado', '#00CC00');
+
+        if (linkedScenarioData) {
+            // Modo enlazado: genera .feature con textos Gherkin custom + scenario_linked.json
+            const r = await api.generateLinkedFiles(
+                featureName, scenarioName,
+                linkedScenarioData.stepRows,
+                linkedScenarioData.linked
+            );
+            enableBtn(btnGenerate);
+            if (r.success) {
+                setGenerate('✓ ' + r.featurePath + '  |  ' + r.jsonPath, 'ok');
+                setStatus('✓ Generado (.feature + JSON enlazado)', '#00CC00');
+                linkedScenarioData = null; // limpiar para el próximo ciclo
+            } else {
+                setGenerate('✗ ' + r.error, 'err');
+            }
         } else {
-            setGenerate('✗ ' + r.error, 'err');
+            // Modo normal: genera .feature desde los steps individuales
+            const r = await api.generateFiles(featureName, scenarioName);
+            enableBtn(btnGenerate);
+            if (r.success) {
+                setGenerate('✓ ' + r.featurePath, 'ok');
+                setStatus('✓ Generado', '#00CC00');
+            } else {
+                setGenerate('✗ ' + r.error, 'err');
+            }
         }
     });
 
@@ -660,6 +757,249 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
         xmlModal.style.display = 'none';
         setStatus('✓ XPath cargado desde Hierarchy Viewer', '#00CC00');
+    });
+
+    // ─── ENLAZAR ─────────────────────────────────────────────────────────────
+    const enlazarModal         = document.getElementById('enlazarModal');
+    const enlazarStepsList     = document.getElementById('enlazarStepsList');
+    const scenarioRowsContainer= document.getElementById('scenarioRows');
+    const btnNuevoStep         = document.getElementById('btnNuevoStep');
+    const btnCloseEnlazar      = document.getElementById('btnCloseEnlazar');
+    const btnConfirmarEscenario= document.getElementById('btnConfirmarEscenario');
+    const btnEnlazar           = document.getElementById('btnEnlazar');
+    const enlazarHint          = document.getElementById('enlazarHint');
+
+    // Estado del constructor de escenario
+    let enlazarSteps      = [];   // copia de recordedSteps al abrir el modal
+    let scenarioRows      = [];   // [{ text: string, stepIndices: number[] }]
+    let activeRowIndex    = -1;   // fila seleccionada en el constructor
+    let linkedScenarioData = null; // { linked, stepTexts } — seteado al confirmar, usado al generar
+
+    const GHERKIN_KEYWORDS = ['Given', 'When', 'Then', 'And', 'But'];
+
+    function scenarioRowHtml(row, rowIdx) {
+        const assignedHtml = row.stepIndices.length === 0
+            ? '<span class="assigned-empty-hint">← Haz click en un step de la izquierda para asignarlo</span>'
+            : row.stepIndices.map(si => {
+                const s = enlazarSteps[si];
+                const label = s ? stepSummary(s) : 'Step #' + si;
+                return `<span class="assigned-chip" data-row="${rowIdx}" data-si="${si}">
+                    ${label.slice(0, 50)}${label.length > 50 ? '…' : ''}
+                    <span class="chip-remove" data-row="${rowIdx}" data-si="${si}">✕</span>
+                </span>`;
+            }).join('');
+
+        const kwOptions = GHERKIN_KEYWORDS.map(kw =>
+            `<option value="${kw}"${row.keyword === kw ? ' selected' : ''}>${kw}</option>`
+        ).join('');
+
+        return `<div class="scenario-row${rowIdx === activeRowIndex ? ' active' : ''}" data-row="${rowIdx}">
+            <div class="scenario-row-header">
+                <span class="row-number">${rowIdx + 1}</span>
+                <select class="scenario-kw-select" data-row="${rowIdx}">${kwOptions}</select>
+                <input type="text" class="scenario-step-input" placeholder="descripción del step..." value="${row.text.replace(/"/g, '&quot;')}" data-row="${rowIdx}"/>
+                <button class="btn-remove-row" data-row="${rowIdx}">✕</button>
+            </div>
+            <div class="assigned-steps-area${row.stepIndices.length === 0 ? ' empty-area' : ''}" data-row="${rowIdx}">
+                ${assignedHtml}
+            </div>
+        </div>`;
+    }
+
+    function renderScenarioRows() {
+        if (scenarioRows.length === 0) {
+            scenarioRowsContainer.innerHTML =
+                '<div class="scenario-empty-hint">Agrega un step con el botón "+ Nuevo Step"<br/>o haz click en un step grabado de la izquierda</div>';
+            return;
+        }
+        scenarioRowsContainer.innerHTML = scenarioRows.map((r, i) => scenarioRowHtml(r, i)).join('');
+
+        // Eventos de las filas
+        scenarioRowsContainer.querySelectorAll('.scenario-row').forEach(el => {
+            el.addEventListener('click', e => {
+                // Ignorar clicks en input, remove-row o chip-remove
+                if (e.target.classList.contains('scenario-step-input')) return;
+                if (e.target.classList.contains('btn-remove-row')) return;
+                if (e.target.classList.contains('chip-remove')) return;
+                const ri = parseInt(el.dataset.row);
+                activeRowIndex = (activeRowIndex === ri) ? -1 : ri;
+                updateEnlazarHint();
+                renderScenarioRows();
+            });
+        });
+
+        // Select: guardar keyword al cambiar
+        scenarioRowsContainer.querySelectorAll('.scenario-kw-select').forEach(sel => {
+            sel.addEventListener('change', e => {
+                const ri = parseInt(sel.dataset.row);
+                scenarioRows[ri].keyword = e.target.value;
+            });
+            sel.addEventListener('click', e => e.stopPropagation());
+        });
+
+        // Input: guardar texto al escribir
+        scenarioRowsContainer.querySelectorAll('.scenario-step-input').forEach(inp => {
+            inp.addEventListener('input', e => {
+                const ri = parseInt(inp.dataset.row);
+                scenarioRows[ri].text = e.target.value;
+            });
+            inp.addEventListener('click', e => {
+                e.stopPropagation();
+                const ri = parseInt(inp.dataset.row);
+                activeRowIndex = ri;
+                updateEnlazarHint();
+                renderScenarioRows();
+                // Restaurar foco al input
+                setTimeout(() => {
+                    const freshInp = scenarioRowsContainer.querySelector(`.scenario-step-input[data-row="${ri}"]`);
+                    if (freshInp) { freshInp.focus(); freshInp.setSelectionRange(freshInp.value.length, freshInp.value.length); }
+                }, 0);
+            });
+        });
+
+        // Botón eliminar fila
+        scenarioRowsContainer.querySelectorAll('.btn-remove-row').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const ri = parseInt(btn.dataset.row);
+                scenarioRows.splice(ri, 1);
+                if (activeRowIndex >= scenarioRows.length) activeRowIndex = scenarioRows.length - 1;
+                renderScenarioRows();
+                renderEnlazarSteps();
+            });
+        });
+
+        // Botón quitar chip de step asignado
+        scenarioRowsContainer.querySelectorAll('.chip-remove').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const ri = parseInt(btn.dataset.row);
+                const si = parseInt(btn.dataset.si);
+                scenarioRows[ri].stepIndices = scenarioRows[ri].stepIndices.filter(x => x !== si);
+                renderScenarioRows();
+                renderEnlazarSteps();
+            });
+        });
+    }
+
+    function renderEnlazarSteps() {
+        enlazarStepsList.innerHTML = '';
+        if (!enlazarSteps || enlazarSteps.length === 0) {
+            enlazarStepsList.innerHTML = '<li class="step-empty">Sin steps grabados</li>';
+            return;
+        }
+        const usedIndices = new Set(scenarioRows.flatMap(r => r.stepIndices));
+        enlazarSteps.forEach((s, i) => {
+            const li = document.createElement('li');
+            li.textContent = (i + 1) + '. ' + stepSummary(s);
+            li.dataset.index = i;
+            li.classList.add('assignable');
+            if (usedIndices.has(i)) li.classList.add('step-used');
+            li.addEventListener('click', () => {
+                if (activeRowIndex < 0) {
+                    // Si no hay fila activa, crear una nueva y asignar
+                    const defaultKw = scenarioRows.length === 0 ? 'Given' : 'And';
+                    scenarioRows.push({ text: '', keyword: defaultKw, stepIndices: [i] });
+                    activeRowIndex = scenarioRows.length - 1;
+                } else {
+                    // Asignar a la fila activa (si no está ya)
+                    if (!scenarioRows[activeRowIndex].stepIndices.includes(i)) {
+                        scenarioRows[activeRowIndex].stepIndices.push(i);
+                    }
+                }
+                updateEnlazarHint();
+                renderScenarioRows();
+                renderEnlazarSteps();
+            });
+            enlazarStepsList.appendChild(li);
+        });
+    }
+
+    function updateEnlazarHint() {
+        if (activeRowIndex >= 0) {
+            enlazarHint.textContent = '🔗 Modo Enlazar — fila ' + (activeRowIndex + 1) + ' activa, haz click en steps de la izquierda';
+        } else {
+            enlazarHint.textContent = '🔗 Modo Enlazar — asigna steps a cada fila del escenario';
+        }
+    }
+
+    btnEnlazar.addEventListener('click', async () => {
+        // Cargar steps actuales
+        const sr = await api.getSteps();
+        enlazarSteps = sr.steps || [];
+        activeRowIndex = -1;
+        updateEnlazarHint();
+        renderEnlazarSteps();
+        renderScenarioRows();
+        enlazarModal.style.display = 'flex';
+    });
+
+    btnCloseEnlazar.addEventListener('click', () => {
+        enlazarModal.style.display = 'none';
+    });
+
+    btnNuevoStep.addEventListener('click', () => {
+        const defaultKw = scenarioRows.length === 0 ? 'Given' : 'And';
+        scenarioRows.push({ text: '', keyword: defaultKw, stepIndices: [] });
+        activeRowIndex = scenarioRows.length - 1;
+        updateEnlazarHint();
+        renderScenarioRows();
+        // Foco en el nuevo input
+        setTimeout(() => {
+            const inputs = scenarioRowsContainer.querySelectorAll('.scenario-step-input');
+            if (inputs.length > 0) inputs[inputs.length - 1].focus();
+        }, 0);
+    });
+
+    btnConfirmarEscenario.addEventListener('click', () => {
+        if (scenarioRows.length === 0) {
+            enlazarHint.textContent = '⚠ Agrega al menos un step al escenario';
+            enlazarHint.style.color = '#CC0000';
+            return;
+        }
+
+        // Construir el JSON { "step text": [...steps] }
+        const linked = {};
+        const stepTexts = [];   // solo los textos, para el .feature se pasa el keyword aparte
+        const stepRows  = [];   // { keyword, text } para el .feature
+        scenarioRows.forEach(row => {
+            const key = row.text.trim() || 'step sin nombre';
+            stepTexts.push(key);
+            stepRows.push({ keyword: row.keyword || 'And', text: key });
+            linked[key] = row.stepIndices.map(si => {
+                const s = enlazarSteps[si];
+                return {
+                    action:       s.action        || '',
+                    variableName: s.variableName  || '',
+                    selector:     s.selector      || '',
+                    value:        s.value         || '',
+                    description:  s.description   || ''
+                };
+            });
+        });
+
+        // Guardar en memoria para cuando el usuario haga click en GENERAR
+        linkedScenarioData = { linked, stepTexts, stepRows };
+
+        // Construir preview Gherkin y actualizar el textarea de la pantalla principal
+        const featureName  = (txtFeature  && txtFeature.value.trim())  || 'Flujo mobile';
+        const scenarioName = (txtScenario && txtScenario.value.trim()) || 'Escenario';
+        const date = new Date().toLocaleString('es-PE');
+        const gherkinLines = [
+            `# Generado por Appium Visual Recorder`,
+            `# Fecha: ${date}`,
+            `# Locators: ./recorded/locators/recorded.locators`,
+            '',
+            `Feature: ${featureName}`,
+            '',
+            `  Scenario: ${scenarioName}`,
+            ...scenarioRows.map(r => `    ${r.keyword} ${r.text.trim() || 'step sin nombre'}`),
+            ''
+        ];
+        if (txtGherkin) txtGherkin.value = gherkinLines.join('\n');
+
+        setStatus('✓ Escenario enlazado — presiona GENERAR para crear los archivos', '#FF9900');
+        enlazarModal.style.display = 'none';
     });
 
     // ─── INIT ────────────────────────────────────────────────────────────────

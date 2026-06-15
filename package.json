@@ -2,7 +2,7 @@
   "name": "appium-visual-recorder",
   "version": "1.0.0",
   "description": "Visual mobile test recorder with Appium and Cucumber",
-  "main": "dist/main.js",
+  "main": "dist/recorder/src/main.js",
   "scripts": {
     "build": "tsc",
     "start": "npm run build && electron .",

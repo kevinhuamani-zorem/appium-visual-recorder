@@ -138,6 +138,7 @@
                 <textarea id="txtGherkin" class="gherkin-preview" readonly></textarea>
                 <div class="btn-row">
                     <button class="btn btn-navy btn-half" id="btnPreview">👁️ Preview</button>
+                    <button class="btn btn-orange btn-half" id="btnEnlazar">🔗 Enlazar</button>
                     <button class="btn btn-green btn-half" id="btnGenerate">💾 GENERAR</button>
                 </div>
                 <div id="lblGenerateResult" class="generate-result"></div>
@@ -203,6 +204,48 @@
         <footer class="statusbar">
             <span id="lblStatus">✓ Listo</span>
         </footer>
+
+        <!-- ENLAZAR MODAL -->
+        <div id="enlazarModal" class="xml-modal" style="display:none">
+            <div class="enlazar-modal-content">
+                <div class="enlazar-header">
+                    <span class="section-title">🔗 Constructor de Escenario</span>
+                    <div class="xml-modal-actions">
+                        <button class="btn btn-dark" id="btnCloseEnlazar">✕ Cerrar</button>
+                    </div>
+                </div>
+                <div class="enlazar-body">
+
+                    <!-- Panel izquierdo: Steps grabados -->
+                    <div class="enlazar-steps-panel">
+                        <div class="section-title" style="margin-bottom:8px">📋 STEPS GRABADOS</div>
+                        <ul id="enlazarStepsList" class="steps-list enlazar-steps-list">
+                            <li class="step-empty">Sin steps grabados</li>
+                        </ul>
+                    </div>
+
+                    <!-- Panel derecho: Constructor de escenario -->
+                    <div class="enlazar-scenario-panel">
+                        <div class="enlazar-scenario-header">
+                            <span class="section-title">🎬 CONSTRUCTOR DE ESCENARIO</span>
+                            <button class="btn btn-blue" id="btnNuevoStep">+ Nuevo Step</button>
+                        </div>
+                        <div id="scenarioRows" class="scenario-rows">
+                            <div class="scenario-empty-hint">
+                                Agrega un step con el botón "+ Nuevo Step"<br/>
+                                o haz click en un step grabado de la izquierda
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                <div class="enlazar-footer">
+                    <span class="enlazar-hint" id="enlazarHint">🔗 Modo Enlazar — asigna steps a cada fila del escenario</span>
+                    <button class="btn btn-green" id="btnConfirmarEscenario">✓ Confirmar Escenario</button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="app.js"></script>

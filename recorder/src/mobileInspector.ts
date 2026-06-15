@@ -1,8 +1,20 @@
-import { AppiumDriverManager } from './appiumDriverManager';
+import { AppiumDriverManager } from '../../core/appiumDriverManager';
 import { BrowserWindow } from 'electron';
 import { exec } from 'child_process';
 import * as os from 'os';
 import * as fs from 'fs';
+
+export interface SelectorCandidate {
+    label:    string;   // 'resource-id' | 'resource-id contains' | 'content-desc' | 'text' | 'text contains' | 'xpath'
+    selector: string;   // XPath completo listo para usar
+    priority: number;   // 1 = más estable
+}
+
+export interface InspectorResult {
+    candidates: SelectorCandidate[];
+    suggested:  string;   // nombre de variable sugerido basado en el candidato P1
+    tag:        string;   // clase corta del elemento (Button, TextView…)
+}
 
 const IGNORED_CLASSES = [
     'android.widget.FrameLayout',
@@ -31,7 +43,7 @@ export class MobileInspector {
         console.log('[MobileInspector] Inspector activado - toca un elemento');
     }
 
-    async waitForSelection(timeoutSec: number): Promise<string | null> {
+    async waitForSelection(timeoutSec: number): Promise<InspectorResult | null> {
         const limit = Date.now() + timeoutSec * 1000;
         let initialSource = this.lastXml;
 
@@ -49,12 +61,12 @@ export class MobileInspector {
 
                     fs.writeFileSync('/tmp/appium_source.xml', stable, 'utf-8');
 
-                    const xpath = this.parseXPath(stable);
-                    console.log('[MobileInspector] XPath:', xpath);
+                    const result = this.buildCandidates(stable);
+                    console.log('[MobileInspector] Candidatos:', result?.candidates.map(c => `P${c.priority} ${c.label}: ${c.selector}`));
 
-                    if (xpath) {
+                    if (result) {
                         this.inspecting = false;
-                        return xpath;
+                        return result;
                     }
                     initialSource = stable;
                 }
@@ -67,25 +79,42 @@ export class MobileInspector {
 
         try {
             const source = await this.dm.getPageSource();
-            const xpath  = this.parseXPath(source);
+            const result = this.buildCandidates(source);
             this.inspecting = false;
-            return xpath;
+            return result;
         } catch {
             this.inspecting = false;
             return null;
         }
     }
 
-    private parseXPath(xml: string): string | null {
-        // El XML usa tags con nombres de clase: <android.widget.Button .../>
-        // Extraer todos los tags de elemento con sus atributos
+    /**
+     * Analiza el XML de la pantalla y construye todos los identificadores
+     * posibles para el elemento más relevante, ordenados por prioridad:
+     *   P1 resource-id exacto  → más estable
+     *   P2 resource-id contains → flexible ante cambios de package
+     *   P3 content-desc        → accesibilidad
+     *   P4 text exacto         → texto visible
+     *   P5 text contains       → texto parcial
+     *   P6 XPath de clase      → fallback estructural
+     */
+    private buildCandidates(xml: string): InspectorResult | null {
         const tagRegex = /<(android\.[a-zA-Z.]+|androidx\.[a-zA-Z.]+|[a-zA-Z]+\.[a-zA-Z.]+)\s([^>]*?)(?:\/?>)/g;
-        const candidates: Array<{score: number, xpath: string}> = [];
 
+        interface RawElement {
+            score:       number;
+            tagName:     string;
+            resourceId:  string;
+            contentDesc: string;
+            text:        string;
+        }
+
+        const elements: RawElement[] = [];
         let match;
+
         while ((match = tagRegex.exec(xml)) !== null) {
-            const tagName  = match[1];
-            const attribs  = match[2];
+            const tagName = match[1];
+            const attribs = match[2];
 
             const getA = (attr: string) => {
                 const m = attribs.match(new RegExp(`\\b${attr}="([^"]*)"`));
@@ -113,33 +142,81 @@ export class MobileInspector {
             if (focusable === 'true') score += 3;
             if (enabled   === 'true') score += 1;
             if (resourceId && !IGNORED_IDS.includes(resourceId)) score += 7;
-            if (text && text.length > 0 && text.length < 80)     score += 5;
-            if (contentDesc && contentDesc.length > 0)           score += 4;
+            if (text && text.length > 0 && text.length < 80)      score += 5;
+            if (contentDesc && contentDesc.length > 0)            score += 4;
 
             if (score < 5) continue;
 
-            // Construir XPath
-            this.lastTag = tagName.split('.').pop() || 'View';
-            let xpath = '';
-            if (resourceId && !IGNORED_IDS.includes(resourceId))
-                xpath = `//*[@resource-id="${resourceId}"]`;
-            else if (contentDesc && contentDesc.length < 80)
-                xpath = `//*[@content-desc="${contentDesc}"]`;
-            else if (text && text.length > 0 && text.length < 80)
-                xpath = `//*[@text="${text}"]`;
-            else if (tagName)
-                xpath = `//${tagName}`;
-
-            if (xpath) candidates.push({ score, xpath });
+            elements.push({ score, tagName, resourceId, contentDesc, text });
         }
 
-        candidates.sort((a, b) => b.score - a.score);
+        if (elements.length === 0) return null;
 
-        console.log('[MobileInspector] Candidatos top 3:',
-            candidates.slice(0, 3).map(c => `score=${c.score} → ${c.xpath}`)
-        );
+        // Elemento con mayor score = el que el usuario tocó
+        elements.sort((a, b) => b.score - a.score);
+        const el = elements[0];
 
-        return candidates.length > 0 ? candidates[0].xpath : null;
+        this.lastTag = el.tagName.split('.').pop() || 'View';
+
+        const candidates: SelectorCandidate[] = [];
+
+        // P1 — resource-id exacto (más estable)
+        if (el.resourceId && !IGNORED_IDS.includes(el.resourceId)) {
+            candidates.push({
+                label:    'resource-id',
+                selector: `//*[@resource-id="${el.resourceId}"]`,
+                priority: 1,
+            });
+
+            // P2 — resource-id contains (solo la parte tras la "/")
+            const idPart = el.resourceId.split('/')[1];
+            if (idPart) {
+                candidates.push({
+                    label:    'resource-id contains',
+                    selector: `//*[contains(@resource-id,"${idPart}")]`,
+                    priority: 2,
+                });
+            }
+        }
+
+        // P3 — content-desc
+        if (el.contentDesc && el.contentDesc.length > 0 && el.contentDesc.length < 80) {
+            candidates.push({
+                label:    'content-desc',
+                selector: `//*[@content-desc="${el.contentDesc}"]`,
+                priority: 3,
+            });
+        }
+
+        // P4 — text exacto
+        if (el.text && el.text.length > 0 && el.text.length < 80) {
+            candidates.push({
+                label:    'text',
+                selector: `//*[@text="${el.text}"]`,
+                priority: 4,
+            });
+
+            // P5 — text contains (solo si el texto es largo)
+            if (el.text.length > 10) {
+                candidates.push({
+                    label:    'text contains',
+                    selector: `//*[contains(@text,"${el.text.slice(0, 20)}")]`,
+                    priority: 5,
+                });
+            }
+        }
+
+        // P6 — XPath de clase (fallback)
+        candidates.push({
+            label:    'xpath',
+            selector: `//${el.tagName}`,
+            priority: 6,
+        });
+
+        // Nombre de variable sugerido desde el candidato de mayor prioridad
+        const suggested = this.suggestVariableName(candidates[0].selector, this.lastTag);
+
+        return { candidates, suggested, tag: this.lastTag };
     }
 
     buildXPathFromNode(node: string): string {

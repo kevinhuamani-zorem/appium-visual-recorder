@@ -187,7 +187,7 @@ export class MobileStepExecutor {
         const base64 = await this.dm.takeScreenshot();
         const fs     = await import('fs');
         const name   = `screenshot_${Date.now()}.png`;
-        fs.writeFileSync(`recorded/${name}`, base64, 'base64');
+        fs.writeFileSync(`resources/${name}`, base64, 'base64');
         return { success: true, message: `Captura guardada: ${name}` };
     }
 }

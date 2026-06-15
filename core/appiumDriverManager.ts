@@ -7,7 +7,6 @@ export class AppiumDriverManager {
     private driver: Browser | null = null;
     private config: DeviceConfig | null = null;
 
-    // Ya no lanza Appium - solo verifica que este corriendo
     async startAppiumServer(): Promise<void> {
         console.log('[AppiumDriverManager] Verificando servidor Appium en 4723...');
         return new Promise((resolve, reject) => {

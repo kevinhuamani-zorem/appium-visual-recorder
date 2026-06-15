@@ -1,23 +1,23 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
+import fs from 'fs';
 
-// Fix GPU crash en macOS Apple Silicon
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('disable-gpu-compositing');
 
 import path from 'path';
-import { AppiumDriverManager } from './appiumDriverManager';
+import { AppiumDriverManager } from '../../core/appiumDriverManager';
 import { MobileInspector } from './mobileInspector';
-import { MobileStepExecutor } from './mobileStepExecutor';
-import { LocatorManager } from './locatorManager';
+import { MobileStepExecutor } from '../../core/mobileStepExecutor';
+import { LocatorManager } from '../../core/locatorManager';
 import { FeatureGenerator } from './featureGenerator';
-import { RecordedStep } from './models';
+import { RecordedStep } from '../../core/models';
 
 let mainWindow: BrowserWindow | null = null;
 
 const dm             = new AppiumDriverManager();
-const locatorManager = new LocatorManager('./recorded/locators/recorded.locators');
-const featureGen     = new FeatureGenerator('./recorded/features', './recorded/locators/recorded.locators');
+const locatorManager = new LocatorManager('./resources/locators/recorded.locators');
+const featureGen     = new FeatureGenerator('./features/yape-features', './resources/locators/recorded.locators');
 
 let inspector:     MobileInspector    | null = null;
 let executor:      MobileStepExecutor | null = null;
@@ -35,15 +35,15 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
+            preload: path.join(__dirname, 'preload.js')  // dist/recorder/src/preload.js ✓
         }
     });
 
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    // __dirname = dist/recorder/src/ → subir tres niveles hasta la raíz del proyecto
+    mainWindow.loadFile(path.join(__dirname, '../../../recorder/renderer/index.html'));
     mainWindow.webContents.openDevTools({ mode: 'detach' });
     mainWindow.on('closed', () => { mainWindow = null; });
 
-    // Notificar al renderer cuando este listo
     mainWindow.webContents.on('did-finish-load', () => {
         console.log('[Main] Renderer listo');
     });
@@ -103,15 +103,20 @@ ipcMain.handle('get-screenshot', async () => {
 ipcMain.handle('activate-inspector', async () => {
     if (!inspector) return { success: false, error: 'Sin sesion activa' };
     await inspector.activate();
-    const xpath = await inspector.waitForSelection(30);
-    if (xpath) {
-        const tag       = inspector.getLastTag();
-        const suggested = inspector.suggestVariableName(xpath, tag);
-        await inspector.bringPanelToFront(mainWindow);
-        const screenshot = await inspector.captureScreenshot().catch(() => undefined);
-        return { success: true, xpath, tag, suggested, screenshot };
-    }
+    const result = await inspector.waitForSelection(30);
     await inspector.bringPanelToFront(mainWindow);
+    if (result && result.candidates.length > 0) {
+        const screenshot = await inspector.captureScreenshot().catch(() => undefined);
+        return {
+            success:    true,
+            candidates: result.candidates,   // SelectorCandidate[]
+            suggested:  result.suggested,    // nombre de variable sugerido
+            tag:        result.tag,
+            // compatibilidad: el P1 como xpath para código que aún use result.xpath
+            xpath:      result.candidates[0].selector,
+            screenshot,
+        };
+    }
     return { success: false, error: 'Cancelado o timeout' };
 });
 
@@ -191,6 +196,49 @@ ipcMain.handle('find-element-at', async (_, x: number, y: number) => {
     try {
         const xml = await dm.getPageSource();
         return { success: true, xml };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+});
+
+// ─── LINKED JSON ─────────────────────────────────────────────────────────────
+
+ipcMain.handle('generate-linked-files', async (_, featureName: string, scenarioName: string, stepRows: { keyword: string; text: string }[], linked: Record<string, any[]>) => {
+    try {
+        const featuresDir = './features/yape-features';
+        const jsonDir     = './resources';
+        fs.mkdirSync(featuresDir, { recursive: true });
+        fs.mkdirSync(jsonDir, { recursive: true });
+
+        // Generar .feature con keywords elegidos por el usuario
+        const fileName = featureName.toLowerCase()
+            .replace(/\s+/g, '_')
+            .replace(/[^a-z0-9_]/g, '');
+        const featurePath = `${featuresDir}/${fileName}.feature`;
+        const date = new Date().toLocaleString('es-PE');
+        const lines = [
+            `# Generado por Appium Visual Recorder`,
+            `# Fecha: ${date}`,
+            `# Locators: ./resources/locators/recorded.locators`,
+            '',
+            `Feature: ${featureName}`,
+            '',
+            `  Scenario: ${scenarioName}`,
+            ...stepRows.map(r => `    ${r.keyword} ${r.text}`),
+            ''
+        ];
+        fs.writeFileSync(featurePath, lines.join('\n'), 'utf-8');
+
+        // Merge del JSON enlazado (agrega keys nuevas, no reemplaza el archivo)
+        const jsonPath = `${jsonDir}/scenario_linked.json`;
+        let existing: Record<string, any[]> = {};
+        if (fs.existsSync(jsonPath)) {
+            try { existing = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')); } catch { existing = {}; }
+        }
+        const merged = { ...existing, ...linked };
+        fs.writeFileSync(jsonPath, JSON.stringify(merged, null, 2), 'utf-8');
+
+        return { success: true, featurePath, jsonPath };
     } catch (e: any) {
         return { success: false, error: e.message };
     }

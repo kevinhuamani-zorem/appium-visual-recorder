@@ -15,3 +15,5 @@ entendido:@://*[@text="ENTENDIDO"]
 9:@://*[@text="9"]
 ver_todo:@://*[@content-desc="Ver todo"]
 giro_retiro_de_efectivo:@://*[@content-desc="Giro/retiro de efectivo"]
+iniciar_sesi_n:@://*[@content-desc="Iniciar sesión"]
+btn_contra:@://android.widget.Button

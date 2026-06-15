@@ -12,6 +12,7 @@ echo "Esperando Appium..."
 sleep 4
 
 echo "Iniciando Electron..."
+# tsc compila recorder/src/main.ts → dist/recorder/src/main.js (definido en package.json "main")
 npm run build && ./node_modules/.bin/electron .
 
 echo "Cerrando Appium..."
