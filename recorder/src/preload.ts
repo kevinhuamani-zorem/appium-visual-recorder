@@ -1,9 +1,20 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('api', {
+    // ── Local ────────────────────────────────────────────────────────────────
     getDevices:          ()                     => ipcRenderer.invoke('get-devices'),
     getForegroundApp:    (udid: string)         => ipcRenderer.invoke('get-foreground-app', udid),
     startSession:        (config: any)          => ipcRenderer.invoke('start-session', config),
+
+    // ── BrowserStack ─────────────────────────────────────────────────────────
+    bsLoadCredentials:   ()                                     => ipcRenderer.invoke('bs-load-credentials'),
+    bsSaveCredentials:   (u: string, k: string)                => ipcRenderer.invoke('bs-save-credentials', u, k),
+    bsGetDevices:        (u: string, k: string)                => ipcRenderer.invoke('bs-get-devices', u, k),
+    bsGetApps:           (u: string, k: string)                => ipcRenderer.invoke('bs-get-apps', u, k),
+    bsUploadApp:         (u: string, k: string, id: string)   => ipcRenderer.invoke('bs-upload-app', u, k, id),
+    bsStartSession:      (config: any)                         => ipcRenderer.invoke('bs-start-session', config),
+
+    // ── Comunes ───────────────────────────────────────────────────────────────
     getScreenshot:       ()                     => ipcRenderer.invoke('get-screenshot'),
     activateInspector:   ()                     => ipcRenderer.invoke('activate-inspector'),
     verifySelector:      (sel: string)          => ipcRenderer.invoke('verify-selector', sel),

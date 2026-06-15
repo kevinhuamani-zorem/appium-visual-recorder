@@ -33,6 +33,9 @@ out/
 .env.local
 .env.*.local
 
+# BrowserStack credentials (no subir al repositorio)
+resources/bs_config.json
+
 # Logs
 *.log
 logs/

@@ -4,8 +4,8 @@ import { exec } from 'child_process';
 import * as path from 'path';
 
 export class AppiumDriverManager {
-    private driver: Browser | null = null;
-    private config: DeviceConfig | null = null;
+    protected driver: Browser | null = null;
+    protected config: DeviceConfig | null = null;
 
     async startAppiumServer(): Promise<void> {
         console.log('[AppiumDriverManager] Verificando servidor Appium en 4723...');

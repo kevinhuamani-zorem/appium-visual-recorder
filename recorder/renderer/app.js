@@ -8,6 +8,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     // ─── ELEMENTOS CONFIG ────────────────────────────────────────────────────
     const screenConfig    = document.getElementById('screenConfig');
     const screenRecorder  = document.getElementById('screenRecorder');
+
+    // Local
+    const localPanel      = document.getElementById('localPanel');
     const cmbDevices      = document.getElementById('cmbDevices');
     const lblDeviceInfo   = document.getElementById('lblDeviceInfo');
     const btnRefreshDev   = document.getElementById('btnRefreshDevices');
@@ -18,6 +21,41 @@ window.addEventListener('DOMContentLoaded', async () => {
     const btnDetectApp    = document.getElementById('btnDetectApp');
     const btnStart        = document.getElementById('btnStartSession');
     const lblConfigSt     = document.getElementById('lblConfigStatus');
+
+    // BrowserStack
+    const bsPanel         = document.getElementById('bsPanel');
+    const tabLocal        = document.getElementById('tabLocal');
+    const tabBS           = document.getElementById('tabBS');
+    const txtBsUser       = document.getElementById('txtBsUser');
+    const txtBsKey        = document.getElementById('txtBsKey');
+    const btnBsSaveCreds  = document.getElementById('btnBsSaveCreds');
+    const lblBsCreds      = document.getElementById('lblBsCreds');
+    const cmbBsDevices    = document.getElementById('cmbBsDevices');
+    const btnBsListDevices= document.getElementById('btnBsListDevices');
+    const lblBsDeviceInfo = document.getElementById('lblBsDeviceInfo');
+    const cmbBsApps       = document.getElementById('cmbBsApps');
+    const btnBsListApps   = document.getElementById('btnBsListApps');
+    const lblBsAppsInfo   = document.getElementById('lblBsAppsInfo');
+    const txtBsAppUrl     = document.getElementById('txtBsAppUrl');
+    const txtBsPackage    = document.getElementById('txtBsPackage');
+    const txtBsActivity   = document.getElementById('txtBsActivity');
+    const lblBsStatus     = document.getElementById('lblBsStatus');
+    const btnBsStart      = document.getElementById('btnBsStartSession');
+
+    let activeMode = 'local'; // 'local' | 'bs'
+
+    // Upload modal
+    const uploadModal         = document.getElementById('uploadModal');
+    const btnOpenUploadModal  = document.getElementById('btnOpenUploadModal');
+    const btnCloseUploadModal = document.getElementById('btnCloseUploadModal');
+    const txtUploadCustomId   = document.getElementById('txtUploadCustomId');
+    const uploadDropZone      = document.getElementById('uploadDropZone');
+    const uploadProgress      = document.getElementById('uploadProgress');
+    const uploadProgressFill  = document.getElementById('uploadProgressFill');
+    const uploadProgressLabel = document.getElementById('uploadProgressLabel');
+    const uploadResult        = document.getElementById('uploadResult');
+    const uploadResultText    = document.getElementById('uploadResultText');
+    const btnCopyAppUrl       = document.getElementById('btnCopyAppUrl');
 
     // ─── ELEMENTOS RECORDER ──────────────────────────────────────────────────
     const lblDevice       = document.getElementById('lblDevice');
@@ -170,6 +208,313 @@ window.addEventListener('DOMContentLoaded', async () => {
         if (txtDesc)     txtDesc.value     = '';
         setVerify('— Ingresa un selector');
     }
+
+    // ─── TAB SWITCHER ────────────────────────────────────────────────────────
+    function switchTab(mode) {
+        activeMode = mode;
+        if (mode === 'local') {
+            tabLocal.classList.add('active');
+            tabBS.classList.remove('active');
+            localPanel.style.display = 'flex';
+            bsPanel.style.display    = 'none';
+        } else {
+            tabBS.classList.add('active');
+            tabLocal.classList.remove('active');
+            bsPanel.style.display    = 'flex';
+            localPanel.style.display = 'none';
+        }
+    }
+
+    tabLocal.addEventListener('click', () => switchTab('local'));
+    tabBS.addEventListener('click',    () => switchTab('bs'));
+
+    // ─── MODAL DE UPLOAD ──────────────────────────────────────────────────────
+    let lastUploadedUrl = '';
+
+    function openUploadModal() {
+        // Resetear estado
+        uploadProgress.style.display    = 'none';
+        uploadResult.style.display      = 'none';
+        uploadDropZone.style.display    = 'flex';
+        uploadProgressFill.style.width  = '0%';
+        uploadProgressLabel.textContent = 'Subiendo...';
+        uploadResultText.textContent    = '';
+        uploadResultText.className      = 'upload-result-text';
+        lastUploadedUrl                 = '';
+        uploadModal.style.display       = 'flex';
+    }
+
+    function closeUploadModal() {
+        uploadModal.style.display = 'none';
+    }
+
+    btnOpenUploadModal.addEventListener('click', () => {
+        switchTab('bs'); // asegurar que el tab BS está activo
+        openUploadModal();
+    });
+    btnCloseUploadModal.addEventListener('click', closeUploadModal);
+    uploadModal.addEventListener('click', e => { if (e.target === uploadModal) closeUploadModal(); });
+
+    // Drag & drop visual
+    uploadDropZone.addEventListener('dragover', e => {
+        e.preventDefault();
+        uploadDropZone.classList.add('dragging');
+    });
+    uploadDropZone.addEventListener('dragleave', () => uploadDropZone.classList.remove('dragging'));
+    uploadDropZone.addEventListener('drop', e => {
+        e.preventDefault();
+        uploadDropZone.classList.remove('dragging');
+        // Electron drag-drop: el archivo viene en e.dataTransfer.files
+        // Pero el path real solo lo tenemos si el usuario lo arrastra desde Finder
+        // Lo gestionamos igual que el clic (abrimos diálogo)
+        startUpload();
+    });
+
+    uploadDropZone.addEventListener('click', startUpload);
+
+    async function startUpload() {
+        const u = txtBsUser.value.trim();
+        const k = txtBsKey.value.trim();
+        if (!u || !k) {
+            uploadResultText.textContent  = '⚠ Primero ingresa tus credenciales de BrowserStack en el panel.';
+            uploadResultText.className    = 'upload-result-text err';
+            uploadResult.style.display    = 'block';
+            uploadDropZone.style.display  = 'none';
+            return;
+        }
+
+        const customId = txtUploadCustomId.value.trim();
+
+        // Mostrar progreso
+        uploadDropZone.style.display   = 'none';
+        uploadResult.style.display     = 'none';
+        uploadProgress.style.display   = 'flex';
+        uploadProgressLabel.textContent = 'Abriendo selector de archivo...';
+        uploadProgressFill.style.width  = '10%';
+
+        // Simular progreso visual mientras esperamos
+        let pct = 10;
+        const progressTimer = setInterval(() => {
+            if (pct < 85) { pct += 3; uploadProgressFill.style.width = pct + '%'; }
+        }, 600);
+
+        uploadProgressLabel.textContent = 'Subiendo a BrowserStack...';
+
+        const r = await api.bsUploadApp(u, k, customId);
+        clearInterval(progressTimer);
+
+        uploadProgress.style.display  = 'none';
+        uploadResult.style.display    = 'block';
+
+        if (r.canceled) {
+            // Usuario canceló el diálogo — volver a mostrar la zona de drop
+            uploadResult.style.display   = 'none';
+            uploadDropZone.style.display = 'flex';
+            return;
+        }
+
+        if (r.success) {
+            lastUploadedUrl = r.appUrl;
+            uploadProgressFill.style.width = '100%';
+            uploadResultText.className = 'upload-result-text ok';
+            uploadResultText.innerHTML =
+                `✓ <strong>${r.filename}</strong> (${r.sizeMB} MB) subido correctamente.<br/>` +
+                `<br/>App URL:<br/><code style="font-size:11px;word-break:break-all">${r.appUrl}</code>` +
+                (r.customId ? `<br/>Custom ID: <code>${r.customId}</code>` : '');
+            btnCopyAppUrl.style.display = 'block';
+        } else {
+            uploadResultText.className   = 'upload-result-text err';
+            uploadResultText.textContent = '✗ ' + r.error;
+            btnCopyAppUrl.style.display  = 'none';
+            // Permitir reintentar
+            setTimeout(() => {
+                uploadDropZone.style.display = 'flex';
+                uploadResult.style.display   = 'none';
+            }, 3000);
+        }
+    }
+
+    btnCopyAppUrl.addEventListener('click', () => {
+        if (!lastUploadedUrl) return;
+        // Auto-llenar el campo de App URL en el panel BS y cerrar
+        txtBsAppUrl.value = lastUploadedUrl;
+        // Refrescar lista de apps
+        const u = txtBsUser.value.trim();
+        const k = txtBsKey.value.trim();
+        if (u && k) {
+            api.bsGetApps(u, k).then(r => {
+                if (r.success && Array.isArray(r.apps)) {
+                    cmbBsApps.innerHTML = '<option value="">— Elige un APK —</option>';
+                    r.apps.forEach(a => {
+                        const opt = document.createElement('option');
+                        opt.value = a.app_url;
+                        opt.textContent = a.app_name + (a.app_version ? ' v' + a.app_version : '');
+                        if (a.app_url === lastUploadedUrl) opt.selected = true;
+                        cmbBsApps.appendChild(opt);
+                    });
+                    lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ' APK(s)';
+                    lblBsAppsInfo.style.color = '#00CC00';
+                }
+            });
+        }
+        closeUploadModal();
+        setConfigStatus && setConfigStatus('✓ App URL cargada: ' + lastUploadedUrl.slice(0, 30) + '...', 'ok');
+    });
+
+    // ─── BROWSERSTACK ─────────────────────────────────────────────────────────
+
+    // Pre-cargar credenciales guardadas
+    async function loadBsCredentials() {
+        const r = await api.bsLoadCredentials();
+        if (r.username) txtBsUser.value = r.username;
+        if (r.accessKey) txtBsKey.value = r.accessKey;
+        if (r.username) lblBsCreds.textContent = '✓ Credenciales cargadas';
+    }
+
+    btnBsSaveCreds.addEventListener('click', async () => {
+        const u = txtBsUser.value.trim();
+        const k = txtBsKey.value.trim();
+        if (!u || !k) { lblBsCreds.textContent = '⚠ Completa usuario y key'; return; }
+        const r = await api.bsSaveCredentials(u, k);
+        lblBsCreds.textContent = r.success ? '✓ Guardadas correctamente' : ('✗ ' + r.error);
+        lblBsCreds.style.color = r.success ? '#00CC00' : '#CC0000';
+    });
+
+    btnBsListDevices.addEventListener('click', async () => {
+        const u = txtBsUser.value.trim();
+        const k = txtBsKey.value.trim();
+        if (!u || !k) {
+            lblBsDeviceInfo.textContent = '⚠ Ingresa usuario y access key primero';
+            return;
+        }
+        lblBsDeviceInfo.textContent = '⏳ Consultando API de BrowserStack...';
+        disableBtn(btnBsListDevices, '⏳');
+
+        const r = await api.bsGetDevices(u, k);
+        enableBtn(btnBsListDevices);
+
+        if (!r.success) {
+            lblBsDeviceInfo.textContent = '✗ ' + r.error;
+            lblBsDeviceInfo.style.color = '#CC0000';
+            return;
+        }
+
+        cmbBsDevices.innerHTML = '';
+        if (r.devices.length === 0) {
+            cmbBsDevices.innerHTML = '<option value="">Sin dispositivos Android disponibles</option>';
+            lblBsDeviceInfo.textContent = '⚠ 0 dispositivos Android (total: ' + (r.total || 0) + ') — revisa logs del terminal';
+            lblBsDeviceInfo.style.color = '#FF9900';
+            return;
+        }
+        r.devices.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = JSON.stringify({ deviceName: d.device, platformVersion: d.os_version });
+            opt.textContent = d.device + ' (Android ' + d.os_version + ')';
+            cmbBsDevices.appendChild(opt);
+        });
+        lblBsDeviceInfo.textContent = '✓ ' + r.devices.length + ' dispositivos Android';
+        lblBsDeviceInfo.style.color = '#00CC00';
+    });
+
+    btnBsListApps.addEventListener('click', async () => {
+        const u = txtBsUser.value.trim();
+        const k = txtBsKey.value.trim();
+        if (!u || !k) {
+            lblBsAppsInfo.textContent = '⚠ Ingresa credenciales primero';
+            return;
+        }
+        lblBsAppsInfo.textContent = '⏳ Cargando apps subidas...';
+        disableBtn(btnBsListApps, '⏳');
+
+        const r = await api.bsGetApps(u, k);
+        enableBtn(btnBsListApps);
+
+        if (!r.success) {
+            lblBsAppsInfo.textContent = '✗ ' + r.error;
+            lblBsAppsInfo.style.color = '#CC0000';
+            return;
+        }
+        if (r.apps.length === 0) {
+            lblBsAppsInfo.textContent = '⚠ No hay APKs subidos en los últimos 30 días';
+            lblBsAppsInfo.style.color = '#FF9900';
+            return;
+        }
+
+        cmbBsApps.innerHTML = '<option value="">— Elige un APK —</option>';
+        r.apps.forEach(a => {
+            const opt = document.createElement('option');
+            opt.value = a.app_url;
+            const date = a.uploaded_at ? ' · ' + a.uploaded_at.slice(0, 10) : '';
+            opt.textContent = a.app_name + (a.app_version ? ' v' + a.app_version : '') + date;
+            cmbBsApps.appendChild(opt);
+        });
+        lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ' APK(s) disponibles';
+        lblBsAppsInfo.style.color = '#00CC00';
+    });
+
+    // Al elegir una app del dropdown, auto-llenar el campo URL
+    cmbBsApps.addEventListener('change', () => {
+        if (cmbBsApps.value) {
+            txtBsAppUrl.value = cmbBsApps.value;
+        }
+    });
+
+    btnBsStart.addEventListener('click', async () => {
+        const u   = txtBsUser.value.trim();
+        const k   = txtBsKey.value.trim();
+        const pkg = txtBsPackage.value.trim();
+        const act = txtBsActivity.value.trim();
+        const app_url = txtBsAppUrl.value.trim();
+
+        if (!u || !k)   { lblBsStatus.textContent = '⚠ Ingresa credenciales';   lblBsStatus.className = 'config-status err'; return; }
+        if (!cmbBsDevices.value || cmbBsDevices.value === '') {
+            lblBsStatus.textContent = '⚠ Lista y elige un dispositivo';
+            lblBsStatus.className = 'config-status err'; return;
+        }
+        if (!pkg) { lblBsStatus.textContent = '⚠ Ingresa el package'; lblBsStatus.className = 'config-status err'; return; }
+
+        const deviceData    = JSON.parse(cmbBsDevices.value);
+        const deviceLabel   = cmbBsDevices.options[cmbBsDevices.selectedIndex].text;
+
+        screenConfig.style.cssText   = 'display:none !important';
+        screenRecorder.style.cssText = 'display:flex !important; flex-direction:column';
+        lblDevice.textContent        = '☁️ ' + deviceLabel + ' — conectando...';
+        setStatus('🔄 Conectando con BrowserStack...', '#FF6600');
+
+        await new Promise(r => setTimeout(r, 50));
+
+        const config = {
+            username:        u,
+            accessKey:       k,
+            deviceName:      deviceData.deviceName,
+            platformVersion: deviceData.platformVersion,
+            appUrl:          app_url,
+            appPackage:      pkg,
+            appActivity:     act || '.MainActivity',
+            projectName:     'Appium Visual Recorder',
+        };
+
+        try {
+            const result = await api.bsStartSession(config);
+            if (result.success) {
+                lblDevice.textContent = '☁️ ' + deviceLabel;
+                setStatus('✓ Sesion BrowserStack — ' + deviceLabel, '#00CC00');
+                if (result.screenshot) updateDeviceScreen(result.screenshot);
+            } else {
+                screenRecorder.style.cssText = 'display:none !important';
+                screenConfig.style.cssText   = 'display:flex !important; flex-direction:column';
+                switchTab('bs');
+                lblBsStatus.textContent = '✗ ' + result.error;
+                lblBsStatus.className   = 'config-status err';
+            }
+        } catch (e) {
+            screenRecorder.style.cssText = 'display:none !important';
+            screenConfig.style.cssText   = 'display:flex !important; flex-direction:column';
+            switchTab('bs');
+            lblBsStatus.textContent = '✗ Error: ' + e.message;
+            lblBsStatus.className   = 'config-status err';
+        }
+    });
 
     // ─── CONFIG ──────────────────────────────────────────────────────────────
     async function loadDevices() {
@@ -1005,5 +1350,5 @@ window.addEventListener('DOMContentLoaded', async () => {
     // ─── INIT ────────────────────────────────────────────────────────────────
     screenConfig.style.cssText   = 'display:flex !important; flex-direction:column';
     screenRecorder.style.cssText = 'display:none !important';
-    await loadDevices();
+    await Promise.all([loadDevices(), loadBsCredentials()]);
 });
