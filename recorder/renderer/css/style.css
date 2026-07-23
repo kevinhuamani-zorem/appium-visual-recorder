@@ -612,11 +612,67 @@ body {
 .hier-node:hover    { background: var(--bg4); color: var(--text); }
 .hier-node.selected { background: #2A2A5E; color: #AAAAFF; }
 .hier-node-container { color: #77799A; cursor: default; }
+.hier-alert-node {
+    margin: 3px 0 7px;
+    padding: 6px;
+    border: 1px solid #D87A00;
+    border-radius: 4px;
+    background: rgba(216, 122, 0, 0.13);
+    color: #FFB34D;
+    cursor: pointer;
+    font-size: 11px;
+}
+.hier-permission-actions {
+    margin: 3px 0 7px;
+    padding: 6px;
+    border: 1px solid #2E75B6;
+    border-radius: 4px;
+    background: rgba(46, 117, 182, 0.13);
+    color: #9FCBFF;
+    font-size: 11px;
+}
+.permission-select-btn {
+    margin: 5px 4px 0 0;
+    padding: 3px 7px;
+    border: 1px solid #4C9BE8;
+    border-radius: 3px;
+    background: #1E4E78;
+    color: #FFFFFF;
+    cursor: pointer;
+    font-size: 11px;
+}
+.permission-select-btn:hover { background: #2E75B6; }
 .hier-node .node-tag  { color: #2E75B6; }
 .hier-node .node-id   { color: #00CC88; font-size: 10px; }
 .hier-node .node-text { color: #FF9900; font-size: 10px; }
 .hier-node-children { padding-left: 14px; }
 .hier-hint { color: var(--text3); font-size: 11px; font-style: italic; }
+.hier-toggle {
+    width: 15px;
+    padding: 0;
+    margin: 0 3px 0 0;
+    border: 0;
+    background: transparent;
+    color: #8B8DB0;
+    cursor: pointer;
+    font: inherit;
+}
+.hier-toggle:disabled { cursor: default; color: #50516A; }
+.hier-xml-row {
+    min-height: 18px;
+    padding-top: 2px;
+    padding-bottom: 2px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: #8EC5FF;
+    cursor: pointer;
+}
+.hier-xml-row:hover { background: var(--bg4); }
+.hier-xml-row.selected { background: #2A2A5E; color: #D0D0FF; }
+.hier-xml-row.xml-close { color: #6788B0; cursor: default; }
+.xml-tag { font-family: 'Courier New', monospace; }
+.xml-collapsed { color: #77799A; }
 
 /* Columna atributos */
 .hier-attrs-panel {
