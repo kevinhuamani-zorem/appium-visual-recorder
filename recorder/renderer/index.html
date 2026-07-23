@@ -271,6 +271,9 @@
                 <div class="xml-modal-header">
                     <span class="section-title">🔍 XML Hierarchy Viewer</span>
                     <div class="xml-modal-actions">
+                        <button class="btn btn-dark" id="btnCopyXml" title="Mostrar XML completo">📋 XML</button>
+                        <button class="btn btn-dark" id="btnCopyTree" title="Mostrar árbol de elementos">🌳 Árbol</button>
+                        <button class="btn btn-dark" id="btnCopyHierarchy" title="Copiar la vista actual">📄 Copiar</button>
                         <button class="btn btn-blue" id="btnRefreshXml">🔄 Refresh</button>
                         <button class="btn btn-dark" id="btnCloseXml">✕ Cerrar</button>
                     </div>
@@ -288,26 +291,36 @@
                         </div>
                     </div>
 
-                    <!-- Arbol XML -->
+                    <!-- Árbol o XML crudo -->
                     <div class="hier-tree-panel">
-                        <div class="section-title" style="margin-bottom:6px">🌳 Hierarchy</div>
+                        <div class="section-title" id="lblHierarchyMode" style="margin-bottom:6px">🌳 Hierarchy</div>
                         <div id="hierTree" class="hier-tree">
                             <span class="hier-hint">Haz click en la imagen</span>
                         </div>
                     </div>
 
-                    <!-- Atributos + XPath -->
+                    <!-- Atributos + selector -->
                     <div class="hier-attrs-panel">
                         <div class="section-title" style="margin-bottom:6px">📋 Atributos</div>
                         <div id="hierAttrs" class="hier-attrs">
                             <span class="hier-hint">Selecciona un elemento</span>
                         </div>
                         <div class="separator" style="margin:8px 0"></div>
-                        <div class="section-title" style="margin-bottom:6px">🎯 XPath sugerido</div>
+                        <div class="section-title" style="margin-bottom:6px">🎯 Selectores sugeridos</div>
                         <div id="hierXpathSuggestions" class="xpath-suggestions"></div>
-                        <label class="field-label" style="margin-top:8px">XPath editable:</label>
-                        <textarea id="txtXpathManual" class="xpath-manual"
-                                  placeholder="//*[@text='Login']"></textarea>
+                        <label class="field-label" style="margin-top:8px">Estrategia:</label>
+                        <select id="cmbLocatorStrategy" class="field-select">
+                            <option value="accessibility">Accessibility ID</option>
+                            <option value="id">ID</option>
+                            <option value="class">Class Name</option>
+                            <option value="xpath">XPath</option>
+                            <option value="android">Android UIAutomator</option>
+                            <option value="iosPredicate">iOS Predicate String</option>
+                            <option value="iosClassChain">iOS Class Chain</option>
+                        </select>
+                        <label class="field-label" style="margin-top:8px">Valor del selector:</label>
+                        <textarea id="txtLocatorValue" class="xpath-manual"
+                                  placeholder="com.example:id/login_button"></textarea>
                         <div class="btn-row" style="margin-top:6px">
                             <button class="btn btn-navy btn-half" id="btnVerifyXpathManual">✅ Verificar</button>
                             <button class="btn btn-green btn-half" id="btnUseXpath">⬆️ Usar</button>

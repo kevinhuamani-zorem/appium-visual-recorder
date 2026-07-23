@@ -101,10 +101,15 @@ window.addEventListener('DOMContentLoaded', async () => {
     const hierTree        = document.getElementById('hierTree');
     const hierAttrs       = document.getElementById('hierAttrs');
     const hierXpathSug    = document.getElementById('hierXpathSuggestions');
-    const txtXpathManual  = document.getElementById('txtXpathManual');
+    const lblHierarchyMode= document.getElementById('lblHierarchyMode');
+    const cmbLocatorStrategy = document.getElementById('cmbLocatorStrategy');
+    const txtLocatorValue = document.getElementById('txtLocatorValue');
     const btnVerifyXpathM = document.getElementById('btnVerifyXpathManual');
     const btnUseXpath     = document.getElementById('btnUseXpath');
     const lblXmlVerify    = document.getElementById('lblXmlVerify');
+    const btnCopyXml      = document.getElementById('btnCopyXml');
+    const btnCopyTree     = document.getElementById('btnCopyTree');
+    const btnCopyHierarchy = document.getElementById('btnCopyHierarchy');
     const btnRefreshXml   = document.getElementById('btnRefreshXml');
     const btnCloseXml     = document.getElementById('btnCloseXml');
     const btnXmlInspector = document.getElementById('btnXmlInspector');
@@ -112,6 +117,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     // ─── ESTADO HIERARCHY ────────────────────────────────────────────────────
     let currentXml     = '';
     let parsedElements = [];
+    let selectedHierarchyElement = null;
+    let hierarchyMode = 'tree';
     let deviceW        = 1080;
     let deviceH        = 2340;
 
@@ -705,6 +712,9 @@ window.addEventListener('DOMContentLoaded', async () => {
                 // Actualizar selector y variable name
                 txtSelector.value = c.selector;
                 const patterns = [
+                    /^id=[^/]+\/(.+)$/,
+                    /^id=(.+)$/,
+                    /^~(.+)$/,
                     /@resource-id="[^"]*\/([^"]+)"/,
                     /@resource-id="([^"]+)"/,
                     /@content-desc="([^"]+)"/,
@@ -750,12 +760,12 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         // Android
         if (el.resourceId && !IGNORED.includes(el.resourceId)) {
-            cands.push({ label: 'resource-id', selector: '//*[@resource-id="' + el.resourceId + '"]', priority: p++ });
+            cands.push({ label: 'ID', selector: 'id=' + el.resourceId, priority: p++ });
             const idPart = el.resourceId.split('/')[1];
             if (idPart) cands.push({ label: 'resource-id contains', selector: '//*[contains(@resource-id,"' + idPart + '")]', priority: p++ });
         }
         if (el.contentDesc && el.contentDesc.length > 0 && el.contentDesc.length < 80)
-            cands.push({ label: 'content-desc', selector: '//*[@content-desc="' + el.contentDesc + '"]', priority: p++ });
+            cands.push({ label: 'Accessibility ID', selector: '~' + el.contentDesc, priority: p++ });
         if (el.text && el.text.length > 0 && el.text.length < 80) {
             cands.push({ label: 'text', selector: '//*[@text="' + el.text + '"]', priority: p++ });
             if (el.text.length > 10)
@@ -784,9 +794,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         return cands;
     }
 
-    /** Sugiere nombre de variable desde un selector XPath */
-    function inferVarName(xpath, tag) {
+    /** Sugiere nombre de variable desde un selector explícito. */
+    function inferVarName(selector, tag) {
         const patterns = [
+            /^id=[^/]+\/(.+)$/,
+            /^id=(.+)$/,
+            /^~(.+)$/,
             /@resource-id="[^"]*\/([^"]+)"/,
             /@resource-id="([^"]+)"/,
             /@content-desc="([^"]+)"/,
@@ -797,7 +810,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const shortTag = (tag || 'element').split('.').pop().toLowerCase()
             .replace('xcuielementtype','');
         for (const re of patterns) {
-            const m = xpath.match(re);
+            const m = selector.match(re);
             if (m) {
                 const name = m[1].toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
                 return shortTag + '_' + name;
@@ -1095,10 +1108,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                 x1, y1, x2, y2
             });
         }
-        // Menor area primero = más específico
-        elements.sort((a, b) =>
-            ((a.x2-a.x1)*(a.y2-a.y1)) - ((b.x2-b.x1)*(b.y2-b.y1))
-        );
         return elements;
     }
 
@@ -1127,8 +1136,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     function syncCanvas() {
-        hierCanvas.width  = hierImg.offsetWidth;
-        hierCanvas.height = hierImg.offsetHeight;
+        // El canvas debe medir exactamente lo mismo que la captura. El panel puede
+        // tener espacio libre debajo de la imagen y no forma parte del dispositivo.
+        const width = hierImg.offsetWidth;
+        const height = hierImg.offsetHeight;
+        hierCanvas.width  = width;
+        hierCanvas.height = height;
+        hierCanvas.style.width  = width + 'px';
+        hierCanvas.style.height = height + 'px';
     }
 
     function showAttrs(el) {
@@ -1149,21 +1164,182 @@ window.addEventListener('DOMContentLoaded', async () => {
         hierAttrs.innerHTML = html || '<span class="hier-hint">Sin atributos</span>';
     }
 
-    function showNodeInTree(el) {
-        if (!el) return;
+    function nodeLabel(el) {
         const short = (el.className || el.tag).split('.').pop();
         const info  = el.resourceId ? (el.resourceId.split('/')[1] || el.resourceId)
-                    : el.text       ? el.text.slice(0, 24)
-                    : el.contentDesc? el.contentDesc.slice(0, 24) : '';
-        hierTree.innerHTML =
-            '<div class="hier-node selected">' +
-            '<span class="node-tag">&lt;' + short + '&gt;</span>' +
-            (info ? ' <span class="node-id">' + info + '</span>' : '') +
-            '</div>' +
-            '<div style="font-size:10px;color:#666888;padding:4px 8px">' +
-            el.x1+','+el.y1+' → '+el.x2+','+el.y2+
-            ' ('+Math.round(el.x2-el.x1)+'×'+Math.round(el.y2-el.y1)+')' +
-            '</div>';
+                    : el.text       ? el.text.slice(0, 28)
+                    : el.contentDesc? el.contentDesc.slice(0, 28) : '';
+        return { short, info };
+    }
+
+    function showNodeInTree(el) {
+        document.querySelectorAll('.hier-node.selected').forEach(node => node.classList.remove('selected'));
+        const treeNode = hierTree.querySelector(`[data-element-index="${parsedElements.indexOf(el)}"]`);
+        if (treeNode) {
+            treeNode.classList.add('selected');
+            treeNode.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    function renderHierarchyTree(xml) {
+        hierTree.innerHTML = '';
+        let nextElementIndex = 0;
+        let documentXml;
+        try {
+            documentXml = new DOMParser().parseFromString(xml, 'application/xml');
+            if (documentXml.querySelector('parsererror')) throw new Error('XML inválido');
+        } catch {
+            hierTree.innerHTML = '<span class="hier-hint">No se pudo interpretar el árbol XML.</span>';
+            return;
+        }
+
+        const locateElement = (xmlNode) => {
+            const bounds = xmlNode.getAttribute('bounds');
+            if (!bounds) return null;
+            const className = xmlNode.getAttribute('class') || '';
+            for (let index = nextElementIndex; index < parsedElements.length; index++) {
+                const el = parsedElements[index];
+                if (getAttrVal(el.attrs, 'bounds') === bounds &&
+                    (!className || el.className === className)) {
+                    nextElementIndex = index + 1;
+                    return el;
+                }
+            }
+            return null;
+        };
+
+        const appendNode = (xmlNode, container, depth) => {
+            if (xmlNode.nodeType !== Node.ELEMENT_NODE) return;
+            const el = locateElement(xmlNode);
+            const row = document.createElement('div');
+            row.className = 'hier-node' + (el ? '' : ' hier-node-container');
+            row.style.paddingLeft = (4 + depth * 13) + 'px';
+            const tag = el ? nodeLabel(el).short : (xmlNode.getAttribute('class') || xmlNode.tagName).split('.').pop();
+            const detail = el ? nodeLabel(el).info : '';
+            row.innerHTML = '<span class="node-tag">&lt;' + tag + '&gt;</span>' +
+                (detail ? ' <span class="node-id"></span>' : '');
+            if (detail) row.querySelector('.node-id').textContent = detail;
+            if (el) {
+                row.dataset.elementIndex = String(parsedElements.indexOf(el));
+                row.title = 'Resaltar este elemento en la captura';
+                row.addEventListener('click', () => selectHierarchyElement(el));
+            }
+            container.appendChild(row);
+            Array.from(xmlNode.children).forEach(child => appendNode(child, container, depth + 1));
+        };
+
+        appendNode(documentXml.documentElement, hierTree, 0);
+        if (!hierTree.children.length) {
+            hierTree.innerHTML = '<span class="hier-hint">El XML no contiene nodos visualizables.</span>';
+        }
+    }
+
+    function hierarchyAsText() {
+        if (!currentXml) return '';
+        try {
+            const documentXml = new DOMParser().parseFromString(currentXml, 'application/xml');
+            if (documentXml.querySelector('parsererror')) return '';
+            const lines = [];
+            const visit = (node, depth) => {
+                if (node.nodeType !== Node.ELEMENT_NODE) return;
+                const className = node.getAttribute('class') || node.tagName;
+                const label = node.getAttribute('resource-id') ||
+                    node.getAttribute('content-desc') || node.getAttribute('text') || '';
+                const bounds = node.getAttribute('bounds') || '';
+                lines.push(`${'  '.repeat(depth)}<${className}>${label ? ` ${label}` : ''}${bounds ? ` ${bounds}` : ''}`);
+                Array.from(node.children).forEach(child => visit(child, depth + 1));
+            };
+            visit(documentXml.documentElement, 0);
+            return lines.join('\n');
+        } catch {
+            return '';
+        }
+    }
+
+    function formatXml(xml) {
+        return xml.replace(/>(\s*)</g, '><').replace(/></g, '>\n<').split('\n').reduce((result, line) => {
+            const trimmed = line.trim();
+            if (!trimmed) return result;
+            const closes = /^<\//.test(trimmed);
+            const opens = /^<[^!?/][^>]*[^/]>$/.test(trimmed);
+            const depth = Math.max(0, result.depth - (closes ? 1 : 0));
+            result.lines.push(`${'  '.repeat(depth)}${trimmed}`);
+            result.depth = depth + (opens ? 1 : 0);
+            return result;
+        }, { lines: [], depth: 0 }).lines.join('\n');
+    }
+
+    function renderHierarchyMode() {
+        if (hierarchyMode === 'xml') {
+            lblHierarchyMode.textContent = '📋 XML source';
+            hierTree.innerHTML = '';
+            const pre = document.createElement('pre');
+            pre.className = 'hier-xml-source';
+            pre.textContent = currentXml ? formatXml(currentXml) : 'No hay XML cargado.';
+            hierTree.appendChild(pre);
+            return;
+        }
+        lblHierarchyMode.textContent = '🌳 Hierarchy';
+        renderHierarchyTree(currentXml);
+        if (!parsedElements.length) {
+            hierTree.innerHTML = '<span class="hier-hint">No se encontraron elementos con bounds.</span>';
+        }
+    }
+
+    function setLocator(strategy, value) {
+        cmbLocatorStrategy.value = strategy;
+        txtLocatorValue.value = value;
+    }
+
+    function selectedLocator() {
+        const value = txtLocatorValue.value.trim();
+        const strategy = cmbLocatorStrategy.value;
+        if (!value) return '';
+        const prefixes = {
+            accessibility: '~', id: 'id=', class: 'class=', xpath: '', android: 'android=',
+            iosPredicate: 'iosPredicate=', iosClassChain: 'iosClassChain='
+        };
+        return prefixes[strategy] + value;
+    }
+
+    function setLocatorFromExplicit(selector) {
+        if (selector.startsWith('~')) return setLocator('accessibility', selector.slice(1));
+        if (selector.startsWith('id=')) return setLocator('id', selector.slice(3));
+        if (selector.startsWith('class=')) return setLocator('class', selector.slice(6));
+        if (selector.startsWith('android=')) return setLocator('android', selector.slice(8));
+        if (selector.startsWith('iosPredicate=')) return setLocator('iosPredicate', selector.slice(13));
+        if (selector.startsWith('iosClassChain=')) return setLocator('iosClassChain', selector.slice(14));
+        setLocator('xpath', selector);
+    }
+
+    async function copyHierarchyContent(text, label) {
+        if (!text) {
+            lblXmlVerify.textContent = '— Primero carga el inspector';
+            lblXmlVerify.className = 'verify-result err';
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(text);
+            lblXmlVerify.textContent = `✓ ${label} copiado al portapapeles`;
+            lblXmlVerify.className = 'verify-result ok';
+        } catch {
+            lblXmlVerify.textContent = `✗ No se pudo copiar el ${label.toLowerCase()}`;
+            lblXmlVerify.className = 'verify-result err';
+        }
+    }
+
+    function selectHierarchyElement(el) {
+        if (!el) return;
+        selectedHierarchyElement = el;
+        syncCanvas();
+        const ctx = hierCanvas.getContext('2d');
+        ctx.clearRect(0, 0, hierCanvas.width, hierCanvas.height);
+        drawRect(el, '#FF6600', 'rgba(255,102,0,0.15)', 2.5);
+        showAttrs(el);
+        showNodeInTree(el);
+        showXpathSuggestions(el);
+        lblXmlVerify.textContent = '— Verifica antes de usar';
+        lblXmlVerify.className   = 'verify-result';
     }
 
     function showXpathSuggestions(el) {
@@ -1173,36 +1349,39 @@ window.addEventListener('DOMContentLoaded', async () => {
         const suggestions = [];
 
         if (el.resourceId && !IGNORED.includes(el.resourceId)) {
-            suggestions.push({ label: 'resource-id', xpath: '//*[@resource-id="' + el.resourceId + '"]' });
+            suggestions.push({ label: 'ID', selector: 'id=' + el.resourceId });
             const idOnly = el.resourceId.split('/')[1];
-            if (idOnly) suggestions.push({ label: 'id contains', xpath: '//*[contains(@resource-id,"' + idOnly + '")]' });
+            if (idOnly) suggestions.push({ label: 'XPath id contains', selector: '//*[contains(@resource-id,"' + idOnly + '")]' });
         }
         if (el.contentDesc) {
-            suggestions.push({ label: 'content-desc', xpath: '//*[@content-desc="' + el.contentDesc + '"]' });
+            suggestions.push({ label: 'Accessibility ID', selector: '~' + el.contentDesc });
         }
         if (el.text && el.text.length > 0 && el.text.length < 60) {
-            suggestions.push({ label: 'text exact', xpath: '//*[@text="' + el.text + '"]' });
+            suggestions.push({ label: 'Android UIAutomator text', selector: 'android=new UiSelector().text("' + el.text + '")' });
+            suggestions.push({ label: 'XPath text', selector: '//*[@text="' + el.text + '"]' });
             if (el.text.length > 4)
-                suggestions.push({ label: 'text contains', xpath: '//*[contains(@text,"' + el.text.slice(0,20) + '")]' });
+                suggestions.push({ label: 'XPath text contains', selector: '//*[contains(@text,"' + el.text.slice(0,20) + '")]' });
         }
         if (el.className) {
-            suggestions.push({ label: 'class', xpath: '//' + el.className });
+            suggestions.push({ label: 'Class Name', selector: 'class=' + el.className });
+            suggestions.push({ label: 'XPath class', selector: '//' + el.className });
         }
 
         suggestions.forEach(s => {
             const chip = document.createElement('div');
             chip.className = 'xpath-chip';
             chip.innerHTML = '<span class="chip-label">' + s.label + '</span>' +
-                             '<span>' + s.xpath + '</span>';
+                             '<span></span>';
+            chip.lastElementChild.textContent = s.selector;
             chip.addEventListener('click', () => {
-                txtXpathManual.value = s.xpath;
+                setLocatorFromExplicit(s.selector);
                 document.querySelectorAll('.xpath-chip').forEach(c => c.style.borderColor = '');
                 chip.style.borderColor = '#7030A0';
             });
             hierXpathSug.appendChild(chip);
         });
 
-        if (suggestions.length > 0) txtXpathManual.value = suggestions[0].xpath;
+        if (suggestions.length > 0) setLocatorFromExplicit(suggestions[0].selector);
     }
 
     // Click en screenshot
@@ -1214,16 +1393,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const el   = findElementAt(px, py);
         if (!el) return;
 
-        syncCanvas();
-        const ctx = hierCanvas.getContext('2d');
-        ctx.clearRect(0, 0, hierCanvas.width, hierCanvas.height);
-        drawRect(el, '#FF6600', 'rgba(255,102,0,0.15)', 2.5);
-
-        showAttrs(el);
-        showNodeInTree(el);
-        showXpathSuggestions(el);
-        lblXmlVerify.textContent = '— Verifica antes de usar';
-        lblXmlVerify.className   = 'verify-result';
+        selectHierarchyElement(el);
     });
 
     // Hover en screenshot
@@ -1242,7 +1412,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     hierScreenWrap.addEventListener('mouseleave', () => {
         syncCanvas();
-        hierCanvas.getContext('2d').clearRect(0, 0, hierCanvas.width, hierCanvas.height);
+        const ctx = hierCanvas.getContext('2d');
+        ctx.clearRect(0, 0, hierCanvas.width, hierCanvas.height);
+        if (selectedHierarchyElement) {
+            drawRect(selectedHierarchyElement, '#FF6600', 'rgba(255,102,0,0.15)', 2.5);
+        }
     });
 
     // Abrir inspector
@@ -1255,31 +1429,38 @@ window.addEventListener('DOMContentLoaded', async () => {
         hierTree.innerHTML    = '<span class="hier-hint">Cargando...</span>';
         hierAttrs.innerHTML   = '<span class="hier-hint">...</span>';
         hierXpathSug.innerHTML = '';
+        selectedHierarchyElement = null;
 
         const [screenshotR, xmlR] = await Promise.all([
             api.getScreenshot(),
             api.getPageSource()
         ]);
 
-        if (screenshotR.success) hierImg.src = screenshotR.screenshot;
+        if (screenshotR.success) {
+            hierImg.onload = () => syncCanvas();
+            hierImg.src = screenshotR.screenshot;
+        }
 
         if (xmlR.success) {
             currentXml     = xmlR.xml;
             parsedElements = parseElements(currentXml);
 
-            const wm = currentXml.match(/width="(\d+)"/);
-            const hm = currentXml.match(/height="(\d+)"/);
-            if (wm) deviceW = parseInt(wm[1]);
-            if (hm) deviceH = parseInt(hm[1]);
-
-            hierTree.innerHTML = '<span class="hier-hint">' +
-                parsedElements.length + ' elementos — haz click en la imagen</span>';
+            // UiAutomator no incluye width/height en la raíz: los bounds son la fuente fiable.
+            deviceW = Math.max(...parsedElements.map(el => el.x2), 1);
+            deviceH = Math.max(...parsedElements.map(el => el.y2), 1);
+            renderHierarchyMode();
         } else {
-            hierTree.innerHTML = '<span style="color:#CC0000">Error cargando XML</span>';
+            hierTree.innerHTML = '<span style="color:#CC0000">Error cargando XML: ' + (xmlR.error || 'desconocido') + '</span>';
         }
     }
 
     btnRefreshXml.addEventListener('click', refreshHierarchy);
+    btnCopyXml.addEventListener('click', () => { hierarchyMode = 'xml'; renderHierarchyMode(); });
+    btnCopyTree.addEventListener('click', () => { hierarchyMode = 'tree'; renderHierarchyMode(); });
+    btnCopyHierarchy.addEventListener('click', () => copyHierarchyContent(
+        hierarchyMode === 'xml' ? currentXml : hierarchyAsText(),
+        hierarchyMode === 'xml' ? 'XML completo' : 'árbol'
+    ));
 
     btnCloseXml.addEventListener('click', () => {
         xmlModal.style.display = 'none';
@@ -1288,11 +1469,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnVerifyXpathM.addEventListener('click', async () => {
-        const xpath = txtXpathManual.value.trim();
-        if (!xpath) return;
+        const locator = selectedLocator();
+        if (!locator) return;
         lblXmlVerify.textContent = '⏳ Verificando...';
         lblXmlVerify.className   = 'verify-result';
-        const r = await api.verifySelector(xpath);
+        const r = await api.verifySelector(locator);
         if (r.success) {
             lblXmlVerify.textContent = r.summary;
             lblXmlVerify.className   = 'verify-result ok';
@@ -1303,17 +1484,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnUseXpath.addEventListener('click', () => {
-        const xpath = txtXpathManual.value.trim();
-        if (!xpath) return;
-        txtSelector.value = xpath;
+        const locator = selectedLocator();
+        if (!locator) return;
+        txtSelector.value = locator;
         const patterns = [
+            /^id=[^/]+\/(.+)$/,
+            /^id=(.+)$/,
+            /^~(.+)$/,
             /@resource-id="[^"]*\/([^"]+)"/,
             /@resource-id="([^"]+)"/,
             /@content-desc="([^"]+)"/,
             /@text="([^"]+)"/
         ];
         for (const re of patterns) {
-            const m = xpath.match(re);
+            const m = locator.match(re);
             if (m) {
                 txtVarName.value = m[1].toLowerCase()
                     .replace(/[^a-z0-9]/g, '_')
@@ -1323,7 +1507,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
         }
         xmlModal.style.display = 'none';
-        setStatus('✓ XPath cargado desde Hierarchy Viewer', '#00CC00');
+        setStatus('✓ Selector cargado desde Hierarchy Viewer', '#00CC00');
     });
 
     // ─── ENLAZAR ─────────────────────────────────────────────────────────────

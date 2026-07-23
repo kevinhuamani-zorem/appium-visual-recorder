@@ -88,6 +88,21 @@ export class AppiumDriverManager {
 
     async findElement(selector: string) {
         const driver = this.getDriver();
+        if (selector.startsWith('id=')) {
+            return await driver.$(`id:${selector.slice(3)}`);
+        }
+        if (selector.startsWith('class=')) {
+            return await driver.$(`class name:${selector.slice(6)}`);
+        }
+        if (selector.startsWith('android=')) {
+            return await driver.$(`android=${selector.slice(8)}`);
+        }
+        if (selector.startsWith('iosPredicate=')) {
+            return await driver.$(`-ios predicate string:${selector.slice(13)}`);
+        }
+        if (selector.startsWith('iosClassChain=')) {
+            return await driver.$(`-ios class chain:${selector.slice(14)}`);
+        }
         if (selector.startsWith('//') || selector.startsWith('(')) {
             return await driver.$(`xpath:${selector}`);
         }

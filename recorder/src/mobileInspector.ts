@@ -172,7 +172,7 @@ export class MobileInspector {
         if (el.resourceId && !IGNORED_IDS.includes(el.resourceId)) {
             candidates.push({
                 label:    'resource-id',
-                selector: `//*[@resource-id="${el.resourceId}"]`,
+                selector: `id=${el.resourceId}`,
                 priority: 1,
             });
             const idPart = el.resourceId.split('/')[1];
@@ -188,7 +188,7 @@ export class MobileInspector {
         if (el.contentDesc && el.contentDesc.length > 0 && el.contentDesc.length < 80) {
             candidates.push({
                 label:    'content-desc',
-                selector: `//*[@content-desc="${el.contentDesc}"]`,
+                selector: `~${el.contentDesc}`,
                 priority: 3,
             });
         }
@@ -348,6 +348,9 @@ export class MobileInspector {
 
     suggestVariableName(xpath: string, tag: string): string {
         const patterns = [
+            /^id=[^/]+\/(.+)$/,
+            /^id=(.+)$/,
+            /^~(.+)$/,
             /@resource-id="[^"]*\/([^"]+)"/,
             /@resource-id="([^"]+)"/,
             /@content-desc="([^"]+)"/,
