@@ -1,32 +1,8 @@
-import { Given, When, Then, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
-import { AppiumDriverManager } from '../../core/appiumDriverManager';
-import { LocatorManager } from '../../core/locatorManager';
-import { MobileStepExecutor } from '../../core/mobileStepExecutor';
+import { Given, When, Then } from '@cucumber/cucumber';
 import { PageFactory } from '../pageFactory';
 import assert from 'assert';
 
-setDefaultTimeout(60 * 1000);
-
-const dm = new AppiumDriverManager();
-const lm = new LocatorManager('./resources/locators/recorded.locators');
-let executor: MobileStepExecutor;
-
-Before(async () => {
-    await dm.init({
-        deviceName:      'SM-A566E',
-        udid:            'R5GL34VQKAX',
-        platformVersion: '16',
-        appPackage:      process.env.APP_PACKAGE || 'com.yape.qa',
-        appActivity:     process.env.APP_ACTIVITY || '.MainActivity',
-    });
-    executor = new MobileStepExecutor(dm, lm);
-    PageFactory.init(dm, executor, lm);
-});
-
-After(async () => {
-    await dm.quit();
-});
-
+// El Before/After y la inicialización del driver viven en steps.ts
 
 Given('el usuario está en la pantalla de login', async () => {
     await PageFactory.login.navigateToPin();

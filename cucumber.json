@@ -2,7 +2,7 @@
   "default": {
     "require": ["automation/step_definitions/*.ts"],
     "requireModule": ["ts-node/register"],
-    "paths": ["automation/features/**/*.feature"],
+    "paths": ["automation/features/yape-features/*.feature"],
     "format": ["progress-bar", "html:resources/reports/report.html"],
     "timeout": 60000
   }

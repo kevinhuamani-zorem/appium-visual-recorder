@@ -4,12 +4,17 @@ import { AppiumDriverManager } from './appiumDriverManager';
 export interface BrowserStackConfig {
     username:        string;
     accessKey:       string;
+    platform:        'android' | 'ios';
     deviceName:      string;
     platformVersion: string;
-    /** URL bs://... obtenida al subir el APK a BrowserStack, o vacía para usar package/activity */
+    /** URL bs://... obtenida al subir el APK/IPA a BrowserStack, o vacía para usar package/bundleId */
     appUrl:          string;
+    /** Android only */
     appPackage:      string;
+    /** Android only */
     appActivity:     string;
+    /** iOS only */
+    bundleId:        string;
     projectName?:    string;
     buildName?:      string;
 }
@@ -29,11 +34,13 @@ export class BrowserStackDriverManager extends AppiumDriverManager {
         this.bsConfig = bsConfig as BrowserStackConfig;
         console.log('[BrowserStackDriverManager] Conectando a BS hub:', bsConfig.deviceName);
 
+        const isIos = bsConfig.platform === 'ios';
+
         const capabilities: any = {
-            platformName:                'Android',
+            platformName:                isIos ? 'iOS' : 'Android',
             'appium:deviceName':         bsConfig.deviceName,
             'appium:platformVersion':    bsConfig.platformVersion,
-            'appium:automationName':     'UiAutomator2',
+            'appium:automationName':     isIos ? 'XCUITest' : 'UiAutomator2',
             'appium:noReset':            true,
             'appium:newCommandTimeout':  300,
             'bstack:options': {
@@ -46,9 +53,11 @@ export class BrowserStackDriverManager extends AppiumDriverManager {
             }
         };
 
-        // App: si hay URL bs:// la usamos; si no, lanzamos por package/activity
+        // App: si hay URL bs:// la usamos; si no, lanzamos por bundleId (iOS) o package/activity (Android)
         if (bsConfig.appUrl && bsConfig.appUrl.trim()) {
             capabilities['appium:app'] = bsConfig.appUrl.trim();
+        } else if (isIos) {
+            capabilities['appium:bundleId'] = bsConfig.bundleId;
         } else {
             capabilities['appium:appPackage']  = bsConfig.appPackage;
             capabilities['appium:appActivity'] = bsConfig.appActivity;

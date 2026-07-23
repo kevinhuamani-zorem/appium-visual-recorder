@@ -1,6 +1,7 @@
 import { AppiumDriverManager } from '../core/appiumDriverManager';
 import { LocatorManager } from '../core/locatorManager';
 import { MobileStepExecutor } from '../core/mobileStepExecutor';
+import { BasePage } from './screenobjects/commons/BasePage';
 import { LoginPage } from './screenobjects/LoginPage';
 import { HomePage } from './screenobjects/HomePage';
 
@@ -57,6 +58,11 @@ export class PageFactory {
         return PageFactory.cache.get(PageClass) as T;
     }
 
+
+    /** Página base — para steps genéricos grabados con el recorder */
+    static get base(): BasePage {
+        return PageFactory.get(BasePage);
+    }
 
     static get login(): LoginPage {
         return PageFactory.get(LoginPage);

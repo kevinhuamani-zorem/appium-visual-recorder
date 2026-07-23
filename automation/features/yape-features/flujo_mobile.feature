@@ -5,5 +5,5 @@
 Feature: Flujo mobile
 
   Scenario: Escenario grabado
-    Given el usuario se logea
+    Given el usuario se logea en el artefacto de QA
     Given el usuario hace click en "{btn_9}"

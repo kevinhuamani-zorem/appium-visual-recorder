@@ -36,6 +36,9 @@ out/
 # BrowserStack credentials (no subir al repositorio)
 resources/bs_config.json
 
+# Configuración de sesión activa (contiene credenciales, no subir)
+resources/session_config.json
+
 # Logs
 *.log
 logs/

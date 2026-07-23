@@ -37,12 +37,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     const btnBsListApps   = document.getElementById('btnBsListApps');
     const lblBsAppsInfo   = document.getElementById('lblBsAppsInfo');
     const txtBsAppUrl     = document.getElementById('txtBsAppUrl');
-    const txtBsPackage    = document.getElementById('txtBsPackage');
-    const txtBsActivity   = document.getElementById('txtBsActivity');
-    const lblBsStatus     = document.getElementById('lblBsStatus');
-    const btnBsStart      = document.getElementById('btnBsStartSession');
+    const txtBsPackage       = document.getElementById('txtBsPackage');
+    const txtBsActivity      = document.getElementById('txtBsActivity');
+    const txtBsBundleId      = document.getElementById('txtBsBundleId');
+    const bsAndroidFields    = document.getElementById('bsAndroidFields');
+    const bsIosFields        = document.getElementById('bsIosFields');
+    const lblBsDevicesTitle  = document.getElementById('lblBsDevicesTitle');
+    const lblBsAppsTitle     = document.getElementById('lblBsAppsTitle');
+    const btnBsPlatAndroid   = document.getElementById('btnBsPlatformAndroid');
+    const btnBsPlatIos       = document.getElementById('btnBsPlatformIos');
+    const lblBsStatus        = document.getElementById('lblBsStatus');
+    const btnBsStart         = document.getElementById('btnBsStartSession');
 
-    let activeMode = 'local'; // 'local' | 'bs'
+    let activeMode    = 'local'; // 'local' | 'bs'
+    let bsPlatform    = 'android'; // 'android' | 'ios'
 
     // Upload modal
     const uploadModal         = document.getElementById('uploadModal');
@@ -228,6 +236,32 @@ window.addEventListener('DOMContentLoaded', async () => {
     tabLocal.addEventListener('click', () => switchTab('local'));
     tabBS.addEventListener('click',    () => switchTab('bs'));
 
+    // ─── PLATFORM TOGGLE (Android / iOS) ────────────────────────────────────
+    function switchBsPlatform(platform) {
+        bsPlatform = platform;
+        const isIos = platform === 'ios';
+
+        btnBsPlatAndroid.classList.toggle('active', !isIos);
+        btnBsPlatIos.classList.toggle('active',  isIos);
+
+        bsAndroidFields.style.display = isIos ? 'none' : 'block';
+        bsIosFields.style.display     = isIos ? 'block' : 'none';
+
+        if (lblBsDevicesTitle) lblBsDevicesTitle.textContent =
+            isIos ? 'Dispositivo iOS en BrowserStack:' : 'Dispositivo Android en BrowserStack:';
+        if (lblBsAppsTitle) lblBsAppsTitle.textContent =
+            isIos ? 'App iOS en BrowserStack:' : 'App Android en BrowserStack:';
+
+        // Limpiar dispositivos y apps al cambiar plataforma (lista es diferente)
+        cmbBsDevices.innerHTML = '<option value="">— Primero lista los dispositivos —</option>';
+        cmbBsApps.innerHTML    = '<option value="">— Carga tus apps o pega la URL abajo —</option>';
+        if (lblBsDeviceInfo) { lblBsDeviceInfo.textContent = ''; }
+        if (lblBsAppsInfo)   { lblBsAppsInfo.textContent   = ''; }
+    }
+
+    btnBsPlatAndroid.addEventListener('click', () => switchBsPlatform('android'));
+    btnBsPlatIos.addEventListener('click',     () => switchBsPlatform('ios'));
+
     // ─── MODAL DE UPLOAD ──────────────────────────────────────────────────────
     let lastUploadedUrl = '';
 
@@ -300,7 +334,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         uploadProgressLabel.textContent = 'Subiendo a BrowserStack...';
 
-        const r = await api.bsUploadApp(u, k, customId);
+        const r = await api.bsUploadApp(u, k, customId, bsPlatform);
         clearInterval(progressTimer);
 
         uploadProgress.style.display  = 'none';
@@ -342,9 +376,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         const u = txtBsUser.value.trim();
         const k = txtBsKey.value.trim();
         if (u && k) {
-            api.bsGetApps(u, k).then(r => {
+            api.bsGetApps(u, k, bsPlatform).then(r => {
+                const appExt = bsPlatform === 'ios' ? 'IPA' : 'APK';
                 if (r.success && Array.isArray(r.apps)) {
-                    cmbBsApps.innerHTML = '<option value="">— Elige un APK —</option>';
+                    cmbBsApps.innerHTML = `<option value="">— Elige un ${appExt} —</option>`;
                     r.apps.forEach(a => {
                         const opt = document.createElement('option');
                         opt.value = a.app_url;
@@ -352,7 +387,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                         if (a.app_url === lastUploadedUrl) opt.selected = true;
                         cmbBsApps.appendChild(opt);
                     });
-                    lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ' APK(s)';
+                    lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ` ${appExt}(s)`;
                     lblBsAppsInfo.style.color = '#00CC00';
                 }
             });
@@ -390,7 +425,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         lblBsDeviceInfo.textContent = '⏳ Consultando API de BrowserStack...';
         disableBtn(btnBsListDevices, '⏳');
 
-        const r = await api.bsGetDevices(u, k);
+        const r = await api.bsGetDevices(u, k, bsPlatform);
         enableBtn(btnBsListDevices);
 
         if (!r.success) {
@@ -399,20 +434,21 @@ window.addEventListener('DOMContentLoaded', async () => {
             return;
         }
 
+        const platLabel = bsPlatform === 'ios' ? 'iOS' : 'Android';
         cmbBsDevices.innerHTML = '';
         if (r.devices.length === 0) {
-            cmbBsDevices.innerHTML = '<option value="">Sin dispositivos Android disponibles</option>';
-            lblBsDeviceInfo.textContent = '⚠ 0 dispositivos Android (total: ' + (r.total || 0) + ') — revisa logs del terminal';
+            cmbBsDevices.innerHTML = `<option value="">Sin dispositivos ${platLabel} disponibles</option>`;
+            lblBsDeviceInfo.textContent = `⚠ 0 dispositivos ${platLabel} (total: ` + (r.total || 0) + ') — revisa logs del terminal';
             lblBsDeviceInfo.style.color = '#FF9900';
             return;
         }
         r.devices.forEach(d => {
             const opt = document.createElement('option');
             opt.value = JSON.stringify({ deviceName: d.device, platformVersion: d.os_version });
-            opt.textContent = d.device + ' (Android ' + d.os_version + ')';
+            opt.textContent = d.device + ' (' + platLabel + ' ' + d.os_version + ')';
             cmbBsDevices.appendChild(opt);
         });
-        lblBsDeviceInfo.textContent = '✓ ' + r.devices.length + ' dispositivos Android';
+        lblBsDeviceInfo.textContent = '✓ ' + r.devices.length + ` dispositivos ${platLabel}`;
         lblBsDeviceInfo.style.color = '#00CC00';
     });
 
@@ -426,21 +462,22 @@ window.addEventListener('DOMContentLoaded', async () => {
         lblBsAppsInfo.textContent = '⏳ Cargando apps subidas...';
         disableBtn(btnBsListApps, '⏳');
 
-        const r = await api.bsGetApps(u, k);
+        const r = await api.bsGetApps(u, k, bsPlatform);
         enableBtn(btnBsListApps);
 
+        const appExt = bsPlatform === 'ios' ? 'IPA' : 'APK';
         if (!r.success) {
             lblBsAppsInfo.textContent = '✗ ' + r.error;
             lblBsAppsInfo.style.color = '#CC0000';
             return;
         }
         if (r.apps.length === 0) {
-            lblBsAppsInfo.textContent = '⚠ No hay APKs subidos en los últimos 30 días';
+            lblBsAppsInfo.textContent = `⚠ No hay ${appExt}s subidos en los últimos 30 días`;
             lblBsAppsInfo.style.color = '#FF9900';
             return;
         }
 
-        cmbBsApps.innerHTML = '<option value="">— Elige un APK —</option>';
+        cmbBsApps.innerHTML = `<option value="">— Elige un ${appExt} —</option>`;
         r.apps.forEach(a => {
             const opt = document.createElement('option');
             opt.value = a.app_url;
@@ -448,7 +485,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             opt.textContent = a.app_name + (a.app_version ? ' v' + a.app_version : '') + date;
             cmbBsApps.appendChild(opt);
         });
-        lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ' APK(s) disponibles';
+        lblBsAppsInfo.textContent = '✓ ' + r.apps.length + ` ${appExt}(s) disponibles`;
         lblBsAppsInfo.style.color = '#00CC00';
     });
 
@@ -460,18 +497,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
 
     btnBsStart.addEventListener('click', async () => {
-        const u   = txtBsUser.value.trim();
-        const k   = txtBsKey.value.trim();
-        const pkg = txtBsPackage.value.trim();
-        const act = txtBsActivity.value.trim();
+        const u       = txtBsUser.value.trim();
+        const k       = txtBsKey.value.trim();
         const app_url = txtBsAppUrl.value.trim();
+        const isIos   = bsPlatform === 'ios';
 
-        if (!u || !k)   { lblBsStatus.textContent = '⚠ Ingresa credenciales';   lblBsStatus.className = 'config-status err'; return; }
+        if (!u || !k) { lblBsStatus.textContent = '⚠ Ingresa credenciales'; lblBsStatus.className = 'config-status err'; return; }
         if (!cmbBsDevices.value || cmbBsDevices.value === '') {
             lblBsStatus.textContent = '⚠ Lista y elige un dispositivo';
             lblBsStatus.className = 'config-status err'; return;
         }
-        if (!pkg) { lblBsStatus.textContent = '⚠ Ingresa el package'; lblBsStatus.className = 'config-status err'; return; }
+
+        // Validación por plataforma
+        if (isIos) {
+            const bid = txtBsBundleId ? txtBsBundleId.value.trim() : '';
+            if (!app_url && !bid) {
+                lblBsStatus.textContent = '⚠ Ingresa el Bundle ID o la App URL';
+                lblBsStatus.className = 'config-status err'; return;
+            }
+        } else {
+            const pkg = txtBsPackage ? txtBsPackage.value.trim() : '';
+            if (!pkg) { lblBsStatus.textContent = '⚠ Ingresa el package'; lblBsStatus.className = 'config-status err'; return; }
+        }
 
         const deviceData    = JSON.parse(cmbBsDevices.value);
         const deviceLabel   = cmbBsDevices.options[cmbBsDevices.selectedIndex].text;
@@ -484,13 +531,17 @@ window.addEventListener('DOMContentLoaded', async () => {
         await new Promise(r => setTimeout(r, 50));
 
         const config = {
+            platform:        bsPlatform,
             username:        u,
             accessKey:       k,
             deviceName:      deviceData.deviceName,
             platformVersion: deviceData.platformVersion,
             appUrl:          app_url,
-            appPackage:      pkg,
-            appActivity:     act || '.MainActivity',
+            // Android
+            appPackage:      txtBsPackage  ? txtBsPackage.value.trim()  : '',
+            appActivity:     txtBsActivity ? txtBsActivity.value.trim() : '.MainActivity',
+            // iOS
+            bundleId:        txtBsBundleId ? txtBsBundleId.value.trim() : '',
             projectName:     'Appium Visual Recorder',
         };
 
@@ -684,31 +735,182 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    // ── Inspector por coordenadas ──────────────────────────────────────────────
+    let inspectorActive      = false;
+    let inspectorClickFn     = null;
+    let inspectorElems       = [];
+    let inspectorDimW        = 0;
+    let inspectorDimH        = 0;
+
+    /** Genera candidatos XPath a partir de un elemento parseado (Android + iOS) */
+    function buildCandidatesFromEl(el) {
+        const IGNORED = ['android:id/content','android:id/navigationBarBackground','android:id/statusBarBackground'];
+        const cands = [];
+        let p = 1;
+
+        // Android
+        if (el.resourceId && !IGNORED.includes(el.resourceId)) {
+            cands.push({ label: 'resource-id', selector: '//*[@resource-id="' + el.resourceId + '"]', priority: p++ });
+            const idPart = el.resourceId.split('/')[1];
+            if (idPart) cands.push({ label: 'resource-id contains', selector: '//*[contains(@resource-id,"' + idPart + '")]', priority: p++ });
+        }
+        if (el.contentDesc && el.contentDesc.length > 0 && el.contentDesc.length < 80)
+            cands.push({ label: 'content-desc', selector: '//*[@content-desc="' + el.contentDesc + '"]', priority: p++ });
+        if (el.text && el.text.length > 0 && el.text.length < 80) {
+            cands.push({ label: 'text', selector: '//*[@text="' + el.text + '"]', priority: p++ });
+            if (el.text.length > 10)
+                cands.push({ label: 'text contains', selector: '//*[contains(@text,"' + el.text.slice(0,20) + '")]', priority: p++ });
+        }
+
+        // iOS (XCUITest)
+        const iosName  = getAttrVal(el.attrs, 'name');
+        const iosLabel = getAttrVal(el.attrs, 'label');
+        const iosValue = getAttrVal(el.attrs, 'value');
+        if (iosName  && iosName.length  > 0 && iosName.length  < 80 && !el.resourceId)
+            cands.push({ label: 'name',  selector: '//*[@name="'  + iosName  + '"]', priority: p++ });
+        if (iosLabel && iosLabel.length > 0 && iosLabel.length < 80 && !el.contentDesc) {
+            cands.push({ label: 'label', selector: '//*[@label="' + iosLabel + '"]', priority: p++ });
+            if (iosLabel.length > 10)
+                cands.push({ label: 'label contains', selector: '//*[contains(@label,"' + iosLabel.slice(0,20) + '")]', priority: p++ });
+        }
+        if (iosValue && iosValue.length > 0 && iosValue.length < 80 && !el.text)
+            cands.push({ label: 'value', selector: '//*[@value="' + iosValue + '"]', priority: p++ });
+
+        // Fallback XPath por clase
+        const tagName = el.className || el.tag;
+        if (tagName && tagName !== 'hierarchy' && tagName !== 'AppiumAUT')
+            cands.push({ label: 'xpath', selector: '//' + tagName, priority: p });
+
+        return cands;
+    }
+
+    /** Sugiere nombre de variable desde un selector XPath */
+    function inferVarName(xpath, tag) {
+        const patterns = [
+            /@resource-id="[^"]*\/([^"]+)"/,
+            /@resource-id="([^"]+)"/,
+            /@content-desc="([^"]+)"/,
+            /@text="([^"]+)"/,
+            /@name="([^"]+)"/,
+            /@label="([^"]+)"/,
+        ];
+        const shortTag = (tag || 'element').split('.').pop().toLowerCase()
+            .replace('xcuielementtype','');
+        for (const re of patterns) {
+            const m = xpath.match(re);
+            if (m) {
+                const name = m[1].toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+                return shortTag + '_' + name;
+            }
+        }
+        return shortTag + '_' + (Date.now() % 1000);
+    }
+
+    function exitInspectorMode() {
+        inspectorActive = false;
+        imgDevice.style.cursor = '';
+        imgDevice.style.outline = '';
+        if (inspectorClickFn) {
+            imgDevice.removeEventListener('click', inspectorClickFn);
+            inspectorClickFn = null;
+        }
+        btnInspect.textContent = '🖱️ Inspeccionar elemento';
+        btnInspect.disabled    = false;
+    }
+
     btnInspect.addEventListener('click', async () => {
-        disableBtn(btnInspect, '⏳ Toca un elemento...');
-        setInspect('Toca un elemento en el dispositivo...', 'active');
-        setStatus('📱 Esperando toque...', '#FF6600');
+        // Si ya está activo → cancelar
+        if (inspectorActive) {
+            exitInspectorMode();
+            setInspect('— Inspección cancelada', '');
+            setStatus('—', '#888AAA');
+            return;
+        }
 
-        const result = await api.activateInspector();
-        enableBtn(btnInspect);
+        // Activar modo inspección
+        inspectorActive        = true;
+        btnInspect.textContent = '✕ Cancelar';
+        setInspect('⏳ Cargando pantalla...', 'active');
+        setStatus('📡 Obteniendo XML de la app...', '#FF6600');
 
-        if (result.success) {
-            // Pre-cargar con el candidato P1 (resource-id si existe)
-            txtSelector.value = result.xpath;
-            txtVarName.value  = result.suggested;
-            if (result.screenshot) updateDeviceScreen(result.screenshot);
+        // Obtener screenshot + XML simultáneamente
+        const [scrR, xmlR] = await Promise.all([
+            api.getScreenshot(),
+            api.getPageSource()
+        ]);
 
-            // Mostrar todos los candidatos como chips clicables
-            if (result.candidates && result.candidates.length > 1) {
-                renderSelectorChips(result.candidates, result.suggested);
+        if (!inspectorActive) return; // fue cancelado durante el await
+
+        if (!xmlR.success) {
+            exitInspectorMode();
+            setInspect('✗ Error al obtener XML: ' + (xmlR.error || 'desconocido'), 'err');
+            setStatus('✗ Error', '#CC0000');
+            return;
+        }
+
+        if (scrR.success) updateDeviceScreen(scrR.screenshot);
+
+        // Parsear elementos y dimensiones del dispositivo
+        inspectorElems = parseElements(xmlR.xml);
+        const wm = xmlR.xml.match(/width="(\d+)"/);
+        const hm = xmlR.xml.match(/height="(\d+)"/);
+        inspectorDimW = wm ? parseInt(wm[1]) : (deviceW || 1080);
+        inspectorDimH = hm ? parseInt(hm[1]) : (deviceH || 2340);
+
+        if (inspectorElems.length === 0) {
+            exitInspectorMode();
+            setInspect('⚠ No se encontraron elementos con bounds en el XML', 'err');
+            setStatus('⚠ Sin elementos', '#FF9900');
+            return;
+        }
+
+        // Indicador visual: cursor crosshair + borde naranja
+        imgDevice.style.cursor  = 'crosshair';
+        imgDevice.style.outline = '2px solid #FF9900';
+        setInspect('🎯 Haz click en el elemento que quieres inspeccionar (' + inspectorElems.length + ' elementos detectados)', 'active');
+        setStatus('🎯 Modo inspección — click en la imagen', '#FF9900');
+
+        // Handler de clic sobre la imagen del dispositivo
+        inspectorClickFn = (e) => {
+            if (!inspectorActive) return;
+
+            const rect = imgDevice.getBoundingClientRect();
+            const px   = Math.round(((e.clientX - rect.left) / rect.width)  * inspectorDimW);
+            const py   = Math.round(((e.clientY - rect.top)  / rect.height) * inspectorDimH);
+
+            // Elemento más pequeño que contiene el punto clickeado
+            let best = null, bestArea = Infinity;
+            inspectorElems.forEach(el => {
+                if (px >= el.x1 && px <= el.x2 && py >= el.y1 && py <= el.y2) {
+                    const area = (el.x2 - el.x1) * (el.y2 - el.y1);
+                    if (area < bestArea) { bestArea = area; best = el; }
+                }
+            });
+
+            exitInspectorMode();
+
+            if (!best) {
+                setInspect('⚠ Sin elemento en esa zona — intenta en otra área', 'err');
+                setStatus('⚠ Sin elemento', '#FF9900');
+                return;
             }
 
-            setInspect('✓ ' + result.candidates.length + ' identificador(es) — elige el mejor', 'ok');
+            const candidates = buildCandidatesFromEl(best);
+            if (candidates.length === 0) {
+                setInspect('⚠ Elemento sin identificadores útiles — elige otro', 'err');
+                setStatus('⚠ Sin identificadores', '#FF9900');
+                return;
+            }
+
+            txtSelector.value = candidates[0].selector;
+            txtVarName.value  = inferVarName(candidates[0].selector, best.tag);
+            if (candidates.length > 1) renderSelectorChips(candidates, txtVarName.value);
+
+            setInspect('✓ ' + candidates.length + ' identificador(es) — elige el mejor', 'ok');
             setStatus('✓ Elemento capturado', '#00CC00');
-        } else {
-            setInspect('Cancelado o timeout', '');
-            setStatus('⚠ Inspector cancelado', '#FF6600');
-        }
+        };
+
+        imgDevice.addEventListener('click', inspectorClickFn);
     });
 
     btnCopy.addEventListener('click', () => {
@@ -820,8 +1022,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             );
             enableBtn(btnGenerate);
             if (r.success) {
-                setGenerate('✓ ' + r.featurePath + '  |  ' + r.jsonPath, 'ok');
-                setStatus('✓ Generado (.feature + JSON enlazado)', '#00CC00');
+                setGenerate('✓ ' + r.featurePath + '  |  linked-steps.ts', 'ok');
+                setStatus('✓ Generado (.feature + linked-steps.ts)', '#00CC00');
                 linkedScenarioData = null; // limpiar para el próximo ciclo
             } else {
                 setGenerate('✗ ' + r.error, 'err');
@@ -850,15 +1052,35 @@ window.addEventListener('DOMContentLoaded', async () => {
         const re = /<([\w.]+)\s([^>]*?)(?:\/>|>)/g;
         let m;
         while ((m = re.exec(xml)) !== null) {
-            const tag    = m[1];
-            const attrs  = m[2];
+            const tag   = m[1];
+            const attrs = m[2];
+            let x1, y1, x2, y2;
+
+            // Formato Android: bounds="[x1,y1][x2,y2]"
             const bounds = getAttrVal(attrs, 'bounds');
-            if (!bounds) continue;
-            const bm = bounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
-            if (!bm) continue;
-            const x1 = parseInt(bm[1]), y1 = parseInt(bm[2]);
-            const x2 = parseInt(bm[3]), y2 = parseInt(bm[4]);
+            if (bounds) {
+                const bm = bounds.match(/\[(\d+),(\d+)\]\[(\d+),(\d+)\]/);
+                if (bm) {
+                    x1 = parseInt(bm[1]); y1 = parseInt(bm[2]);
+                    x2 = parseInt(bm[3]); y2 = parseInt(bm[4]);
+                }
+            }
+
+            // Formato iOS: x="0" y="0" width="120" height="44"
+            if (x1 === undefined) {
+                const xA = getAttrVal(attrs, 'x');
+                const yA = getAttrVal(attrs, 'y');
+                const wA = getAttrVal(attrs, 'width');
+                const hA = getAttrVal(attrs, 'height');
+                if (xA !== '' && yA !== '' && wA !== '' && hA !== '') {
+                    x1 = parseInt(xA); y1 = parseInt(yA);
+                    x2 = x1 + parseInt(wA); y2 = y1 + parseInt(hA);
+                }
+            }
+
+            if (x1 === undefined || x2 === undefined) continue;
             if (x2 <= x1 || y2 <= y1) continue;
+
             elements.push({
                 tag, attrs,
                 resourceId:  getAttrVal(attrs, 'resource-id'),
@@ -873,7 +1095,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 x1, y1, x2, y2
             });
         }
-        // Menor area primero = mas especifico
+        // Menor area primero = más específico
         elements.sort((a, b) =>
             ((a.x2-a.x1)*(a.y2-a.y1)) - ((b.x2-b.x1)*(b.y2-b.y1))
         );

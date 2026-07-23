@@ -121,8 +121,8 @@ El script automaticamente:
 
 ## Archivos generados
 
-    recorded/features/<nombre>.feature    Escenario Gherkin
-    recorded/locators/recorded.locators   Variables de selectores
+    automation/features/yape-features/<nombre>.feature  Escenario Gherkin ejecutable
+    resources/locators/recorded.locators                Variables de selectores
 
     Formato .locators:
     nombre_variable:@:selector
@@ -217,5 +217,4 @@ El reporte HTML se genera en:
     - El XML Hierarchy Viewer es la forma mas confiable de capturar selectores
     - Los selectores por resource-id son los mas estables para automatizacion
     - Los selectores por text pueden fallar si el texto cambia por idioma
-
 

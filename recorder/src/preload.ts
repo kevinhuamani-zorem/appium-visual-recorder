@@ -9,9 +9,9 @@ contextBridge.exposeInMainWorld('api', {
     // ── BrowserStack ─────────────────────────────────────────────────────────
     bsLoadCredentials:   ()                                     => ipcRenderer.invoke('bs-load-credentials'),
     bsSaveCredentials:   (u: string, k: string)                => ipcRenderer.invoke('bs-save-credentials', u, k),
-    bsGetDevices:        (u: string, k: string)                => ipcRenderer.invoke('bs-get-devices', u, k),
-    bsGetApps:           (u: string, k: string)                => ipcRenderer.invoke('bs-get-apps', u, k),
-    bsUploadApp:         (u: string, k: string, id: string)   => ipcRenderer.invoke('bs-upload-app', u, k, id),
+    bsGetDevices:        (u: string, k: string, platform: string) => ipcRenderer.invoke('bs-get-devices', u, k, platform),
+    bsGetApps:           (u: string, k: string, platform: string) => ipcRenderer.invoke('bs-get-apps', u, k, platform),
+    bsUploadApp:         (u: string, k: string, id: string, platform: string) => ipcRenderer.invoke('bs-upload-app', u, k, id, platform),
     bsStartSession:      (config: any)                         => ipcRenderer.invoke('bs-start-session', config),
 
     // ── Comunes ───────────────────────────────────────────────────────────────

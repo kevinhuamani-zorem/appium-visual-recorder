@@ -92,6 +92,33 @@ body {
     background: rgba(255,153,0,0.08);
 }
 
+/* ── Platform toggle (Android / iOS) inside BS panel ─── */
+.bs-platform-toggle {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+}
+.bs-platform-btn {
+    flex: 1;
+    padding: 6px 12px;
+    background: var(--bg4);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text2);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.bs-platform-btn.active {
+    background: var(--purple);
+    border-color: var(--purple);
+    color: #fff;
+}
+.bs-platform-btn:hover:not(.active) {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
 /* ── Upload Modal ─────────────────────────────────────── */
 .upload-modal {
     position: absolute;

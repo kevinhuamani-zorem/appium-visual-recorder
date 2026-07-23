@@ -20,7 +20,8 @@ let mainWindow: BrowserWindow | null = null;
 const dm             = new AppiumDriverManager();
 const bsDm           = new BrowserStackDriverManager();
 const locatorManager = new LocatorManager('./resources/locators/recorded.locators');
-const featureGen     = new FeatureGenerator('./features/yape-features', './resources/locators/recorded.locators');
+// Debe coincidir con cucumber.json para que los escenarios generados se ejecuten.
+const featureGen     = new FeatureGenerator('./automation/features/yape-features', './resources/locators/recorded.locators');
 
 // Apunta al manager activo (local o BrowserStack)
 let activeDm: AppiumDriverManager = dm;
@@ -30,7 +31,19 @@ let executor:      MobileStepExecutor | null = null;
 let recordedSteps: RecordedStep[]     = [];
 let sessionActive  = false;
 
-const BS_CONFIG_PATH = './resources/bs_config.json';
+const BS_CONFIG_PATH      = './resources/bs_config.json';
+const SESSION_CONFIG_PATH = './resources/session_config.json';
+
+/** Persiste la configuración de la sesión activa para que test.sh y steps.ts la usen */
+function saveSessionConfig(config: Record<string, any>): void {
+    try {
+        fs.mkdirSync('./resources', { recursive: true });
+        fs.writeFileSync(SESSION_CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+        console.log('[Main] session_config.json guardado:', config.type, config.platform || 'android');
+    } catch (e: any) {
+        console.warn('[Main] No se pudo guardar session_config:', e.message);
+    }
+}
 
 function createWindow() {
     mainWindow = new BrowserWindow({
@@ -49,7 +62,7 @@ function createWindow() {
 
     // __dirname = dist/recorder/src/ → subir tres niveles hasta la raíz del proyecto
     mainWindow.loadFile(path.join(__dirname, '../../../recorder/renderer/index.html'));
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+
     mainWindow.on('closed', () => { mainWindow = null; });
 
     mainWindow.webContents.on('did-finish-load', () => {
@@ -92,6 +105,17 @@ ipcMain.handle('start-session', async (_, config: any) => {
         executor   = new MobileStepExecutor(activeDm, locatorManager);
         sessionActive = true;
         const screenshot = await inspector.captureScreenshot();
+        // Persistir configuración para test.sh / steps.ts
+        saveSessionConfig({
+            type:            'local',
+            platform:        'android',
+            deviceName:      config.deviceName,
+            udid:            config.udid,
+            platformVersion: config.platformVersion,
+            appPackage:      config.appPackage,
+            appActivity:     config.appActivity,
+            ...(config.appPath ? { appPath: config.appPath } : {}),
+        });
         return { success: true, screenshot };
     } catch (e: any) {
         console.error('[Main] Error:', e.message);
@@ -123,8 +147,8 @@ ipcMain.handle('bs-save-credentials', async (_, username: string, accessKey: str
     }
 });
 
-/** Lista dispositivos Android disponibles en la cuenta de BrowserStack */
-ipcMain.handle('bs-get-devices', async (_, username: string, accessKey: string) => {
+/** Lista dispositivos disponibles en la cuenta de BrowserStack, filtrados por plataforma */
+ipcMain.handle('bs-get-devices', async (_, username: string, accessKey: string, platform: string = 'android') => {
     return new Promise((resolve) => {
         if (!username || !accessKey) {
             resolve({ success: false, error: 'Ingresa usuario y access key' });
@@ -164,13 +188,13 @@ ipcMain.handle('bs-get-devices', async (_, username: string, accessKey: string) 
                         return;
                     }
                     console.log('[BS] Total dispositivos recibidos:', parsed.length);
-                    const android = parsed.filter((d: any) => d.os?.toLowerCase() === 'android');
-                    console.log('[BS] Dispositivos Android:', android.length);
-                    if (android.length === 0 && parsed.length > 0) {
+                    const filtered = parsed.filter((d: any) => d.os?.toLowerCase() === platform);
+                    console.log(`[BS] Dispositivos ${platform}:`, filtered.length);
+                    if (filtered.length === 0 && parsed.length > 0) {
                         const osValues = [...new Set(parsed.map((d: any) => d.os))];
                         console.log('[BS] Valores de "os" encontrados:', osValues);
                     }
-                    resolve({ success: true, devices: android, total: parsed.length });
+                    resolve({ success: true, devices: filtered, total: parsed.length });
                 } catch (e: any) {
                     console.error('[BS] Error parseando JSON:', e.message, '— raw:', data.slice(0, 200));
                     resolve({ success: false, error: 'Error al parsear respuesta: ' + e.message });
@@ -185,8 +209,8 @@ ipcMain.handle('bs-get-devices', async (_, username: string, accessKey: string) 
     });
 });
 
-/** Lista las apps subidas recientemente a BrowserStack (últimos 30 días) */
-ipcMain.handle('bs-get-apps', async (_, username: string, accessKey: string) => {
+/** Lista las apps subidas recientemente a BrowserStack (últimos 30 días), filtradas por plataforma */
+ipcMain.handle('bs-get-apps', async (_, username: string, accessKey: string, platform: string = 'android') => {
     return new Promise((resolve) => {
         if (!username || !accessKey) {
             resolve({ success: false, error: 'Ingresa usuario y access key' });
@@ -221,12 +245,12 @@ ipcMain.handle('bs-get-apps', async (_, username: string, accessKey: string) => 
                         resolve({ success: true, apps: [], message: msg });
                         return;
                     }
-                    // Filtrar solo APK/AAB (Android)
-                    const android = parsed.filter((a: any) =>
-                        a.app_name?.match(/\.(apk|aab|xapk)$/i)
-                    );
-                    console.log('[BS] Apps Android encontradas:', android.length, '/ total:', parsed.length);
-                    resolve({ success: true, apps: android });
+                    // Filtrar por plataforma
+                    const filtered = platform === 'ios'
+                        ? parsed.filter((a: any) => a.app_name?.match(/\.ipa$/i))
+                        : parsed.filter((a: any) => a.app_name?.match(/\.(apk|aab|xapk)$/i));
+                    console.log(`[BS] Apps ${platform} encontradas:`, filtered.length, '/ total:', parsed.length);
+                    resolve({ success: true, apps: filtered });
                 } catch (e: any) {
                     console.error('[BS] Raw response:', data.slice(0, 300));
                     resolve({ success: false, error: 'Error al parsear respuesta: ' + e.message });
@@ -242,14 +266,22 @@ ipcMain.handle('bs-get-apps', async (_, username: string, accessKey: string) => 
  * Abre el diálogo de selección de archivo y sube el APK a BrowserStack.
  * Devuelve el app_url (bs://...) al completar.
  */
-ipcMain.handle('bs-upload-app', async (_, username: string, accessKey: string, customId: string) => {
-    // 1. Abrir diálogo de selección
+ipcMain.handle('bs-upload-app', async (_, username: string, accessKey: string, customId: string, platform: string = 'android') => {
+    // 1. Abrir diálogo de selección — filtro único que incluye todas las extensiones
+    const isIos = platform === 'ios';
     const sel = await dialog.showOpenDialog(mainWindow!, {
-        title: 'Seleccionar APK para subir a BrowserStack',
-        filters: [
-            { name: 'Android Apps', extensions: ['apk', 'aab', 'xapk'] },
-            { name: 'Todos los archivos', extensions: ['*'] }
-        ],
+        title: isIos
+            ? 'Seleccionar IPA para subir a BrowserStack'
+            : 'Seleccionar APK para subir a BrowserStack',
+        filters: isIos
+            ? [
+                { name: 'iOS Apps (.ipa)', extensions: ['ipa'] },
+                { name: 'Todos los archivos', extensions: ['*'] }
+              ]
+            : [
+                { name: 'Android Apps (.apk / .aab)', extensions: ['apk', 'aab', 'xapk'] },
+                { name: 'Todos los archivos', extensions: ['*'] }
+              ],
         properties: ['openFile']
     });
 
@@ -342,6 +374,20 @@ ipcMain.handle('bs-start-session', async (_, config: BrowserStackConfig) => {
         executor   = new MobileStepExecutor(activeDm, locatorManager);
         sessionActive = true;
         const screenshot = await inspector.captureScreenshot();
+        // Persistir configuración para test.sh / steps.ts
+        saveSessionConfig({
+            type:            'browserstack',
+            platform:        config.platform || 'android',
+            username:        config.username,
+            accessKey:       config.accessKey,
+            deviceName:      config.deviceName,
+            platformVersion: config.platformVersion,
+            appUrl:          config.appUrl          || '',
+            appPackage:      config.appPackage      || '',
+            appActivity:     config.appActivity     || '',
+            bundleId:        config.bundleId        || '',
+            projectName:     config.projectName     || 'Appium Visual Recorder',
+        });
         return { success: true, screenshot };
     } catch (e: any) {
         console.error('[Main] BS Error:', e.message);
@@ -463,22 +509,50 @@ ipcMain.handle('find-element-at', async (_, x: number, y: number) => {
     }
 });
 
-// ─── LINKED JSON ─────────────────────────────────────────────────────────────
+// ─── LINKED STEPS (TypeScript) ───────────────────────────────────────────────
+
+/** Convierte un RecordedStep en una línea de código TypeScript usando PageFactory */
+function stepToCode(s: any): string {
+    const loc = s.variableName
+        ? `'${s.variableName}'`
+        : s.selector ? `'${s.selector}'` : "''";
+    const val = (s.value || '').replace(/'/g, "\\'");
+
+    switch (s.action) {
+        case 'CLICK':               return `    await PageFactory.base.click(${loc});`;
+        case 'ESCRIBIR':            return `    await PageFactory.base.type(${loc}, '${val}');`;
+        case 'LIMPIAR':             return `    await PageFactory.base.clear(${loc});`;
+        case 'SCROLL_DOWN':         return `    await PageFactory.base.scrollDown();`;
+        case 'SCROLL_UP':           return `    await PageFactory.base.scrollUp();`;
+        case 'SCROLL_HASTA':        return `    await PageFactory.base.scrollTo(${loc});`;
+        case 'SWIPE':               return `    await PageFactory.base.swipe('${val}');`;
+        case 'PRESION_LARGA':       return `    await PageFactory.base.longPress(${loc});`;
+        case 'VOLVER':              return `    await PageFactory.base.back();`;
+        case 'ESPERAR':             return `    await PageFactory.base.wait(${val || 1});`;
+        case 'SCREENSHOT':          return `    await PageFactory.base.screenshot();`;
+        case 'VERIFICAR_TEXTO':     return `    await PageFactory.base.verifyText(${loc}, '${val}');`;
+        case 'VERIFICAR_EXISTE':    return `    await PageFactory.base.verifyExists(${loc});`;
+        case 'VERIFICAR_NO_EXISTE': return `    await PageFactory.base.verifyNotExists(${loc});`;
+        case 'ABRIR_APP':           return `    // ABRIR_APP: '${val}' — gestionar en Before hook`;
+        default:                    return `    // TODO: ${s.action} ${loc}`;
+    }
+}
 
 ipcMain.handle('generate-linked-files', async (_, featureName: string, scenarioName: string, stepRows: { keyword: string; text: string }[], linked: Record<string, any[]>) => {
     try {
-        const featuresDir = './features/yape-features';
-        const jsonDir     = './resources';
+        // Debe coincidir con cucumber.json para que los escenarios generados se ejecuten.
+        const featuresDir = './automation/features/yape-features';
+        const stepsDir    = './automation/step_definitions';
         fs.mkdirSync(featuresDir, { recursive: true });
-        fs.mkdirSync(jsonDir, { recursive: true });
+        fs.mkdirSync(stepsDir,    { recursive: true });
 
-        // Generar .feature con keywords elegidos por el usuario
+        // ── .feature ──────────────────────────────────────────────────────────
         const fileName = featureName.toLowerCase()
             .replace(/\s+/g, '_')
             .replace(/[^a-z0-9_]/g, '');
         const featurePath = `${featuresDir}/${fileName}.feature`;
         const date = new Date().toLocaleString('es-PE');
-        const lines = [
+        const featureLines = [
             `# Generado por Appium Visual Recorder`,
             `# Fecha: ${date}`,
             `# Locators: ./resources/locators/recorded.locators`,
@@ -489,18 +563,56 @@ ipcMain.handle('generate-linked-files', async (_, featureName: string, scenarioN
             ...stepRows.map(r => `    ${r.keyword} ${r.text}`),
             ''
         ];
-        fs.writeFileSync(featurePath, lines.join('\n'), 'utf-8');
+        fs.writeFileSync(featurePath, featureLines.join('\n'), 'utf-8');
 
-        // Merge del JSON enlazado (agrega keys nuevas, no reemplaza el archivo)
-        const jsonPath = `${jsonDir}/scenario_linked.json`;
-        let existing: Record<string, any[]> = {};
-        if (fs.existsSync(jsonPath)) {
-            try { existing = JSON.parse(fs.readFileSync(jsonPath, 'utf-8')); } catch { existing = {}; }
+        // ── linked-steps.ts ───────────────────────────────────────────────────
+        const linkedStepsPath = `${stepsDir}/linked-steps.ts`;
+
+        // Leer steps existentes para hacer merge (no sobreescribir steps previos)
+        let existingBlocks: string[] = [];
+        if (fs.existsSync(linkedStepsPath)) {
+            const current = fs.readFileSync(linkedStepsPath, 'utf-8');
+            // Extraer bloques Given existentes
+            const blockRegex = /Given\(['"`](.+?)['"`],[\s\S]*?\}\);/g;
+            let m;
+            while ((m = blockRegex.exec(current)) !== null) {
+                existingBlocks.push(m[0]);
+            }
         }
-        const merged = { ...existing, ...linked };
-        fs.writeFileSync(jsonPath, JSON.stringify(merged, null, 2), 'utf-8');
 
-        return { success: true, featurePath, jsonPath };
+        // Construir nuevos bloques desde linked
+        const existingTexts = new Set(existingBlocks.map(b => {
+            const m = b.match(/Given\(['"`](.+?)['"`]/);
+            return m ? m[1] : '';
+        }));
+
+        const newBlocks: string[] = [];
+        for (const [stepText, steps] of Object.entries(linked)) {
+            if (existingTexts.has(stepText)) continue; // no duplicar
+            const lines = steps
+                .filter((s: any) => s.action !== 'ABRIR_APP')
+                .map((s: any) => stepToCode(s));
+            if (lines.length === 0) continue;
+            newBlocks.push(
+                `Given('${stepText}', async () => {\n` +
+                lines.join('\n') +
+                '\n});'
+            );
+        }
+
+        const allBlocks = [...existingBlocks, ...newBlocks];
+
+        const tsContent = [
+            `// Generado por Appium Visual Recorder — ${date}`,
+            `import { Given } from '@cucumber/cucumber';`,
+            `import { PageFactory } from '../pageFactory';`,
+            '',
+            ...allBlocks.map(b => b + '\n'),
+        ].join('\n');
+
+        fs.writeFileSync(linkedStepsPath, tsContent, 'utf-8');
+
+        return { success: true, featurePath, linkedStepsPath };
     } catch (e: any) {
         return { success: false, error: e.message };
     }

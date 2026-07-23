@@ -68,35 +68,54 @@
                     <div id="lblBsCreds" class="device-info"></div>
                 </div>
 
+                <!-- Plataforma -->
+                <div class="config-section">
+                    <label class="field-label">Plataforma:</label>
+                    <div class="bs-platform-toggle">
+                        <button id="btnBsPlatformAndroid" class="bs-platform-btn active">🤖 Android</button>
+                        <button id="btnBsPlatformIos"     class="bs-platform-btn">🍎 iOS</button>
+                    </div>
+                </div>
+
                 <!-- Dispositivos BS -->
                 <div class="config-section">
-                    <label class="field-label">Dispositivo en BrowserStack:</label>
+                    <label class="field-label" id="lblBsDevicesTitle">Dispositivo Android en BrowserStack:</label>
                     <div class="device-row">
                         <select id="cmbBsDevices" class="field-select">
                             <option value="">— Primero lista los dispositivos —</option>
                         </select>
-                        <button class="btn btn-dark" id="btnBsListDevices" title="Listar dispositivos Android disponibles">🔍</button>
+                        <button class="btn btn-dark" id="btnBsListDevices" title="Listar dispositivos disponibles">🔍</button>
                     </div>
                     <div id="lblBsDeviceInfo" class="device-info"></div>
                 </div>
 
                 <!-- App -->
                 <div class="config-section">
-                    <label class="field-label">App en BrowserStack:</label>
+                    <label class="field-label" id="lblBsAppsTitle">App en BrowserStack:</label>
                     <div class="device-row">
                         <select id="cmbBsApps" class="field-select">
                             <option value="">— Carga tus apps o pega la URL abajo —</option>
                         </select>
-                        <button class="btn btn-dark" id="btnBsListApps" title="Listar APKs subidos a tu cuenta">📂</button>
+                        <button class="btn btn-dark" id="btnBsListApps" title="Listar apps subidas a tu cuenta">📂</button>
                     </div>
                     <div id="lblBsAppsInfo" class="device-info"></div>
                     <label class="field-label" style="margin-top:6px">App URL (bs://...) — se auto-llena al elegir arriba:</label>
                     <input type="text" id="txtBsAppUrl" class="field-input"
                            placeholder="bs://c8ddcb5649a8280ca800075bfd8f151115bba6b3"/>
-                    <label class="field-label" style="margin-top:6px">Package de la app:</label>
-                    <input type="text" id="txtBsPackage"  class="field-input" placeholder="com.example.app" value="com.yape.qa"/>
-                    <label class="field-label" style="margin-top:6px">Activity principal:</label>
-                    <input type="text" id="txtBsActivity" class="field-input" placeholder=".MainActivity" value="com.yape.activity.MainActivity"/>
+
+                    <!-- Android: Package + Activity -->
+                    <div id="bsAndroidFields">
+                        <label class="field-label" style="margin-top:6px">Package de la app:</label>
+                        <input type="text" id="txtBsPackage"  class="field-input" placeholder="com.example.app" value="com.yape.qa"/>
+                        <label class="field-label" style="margin-top:6px">Activity principal:</label>
+                        <input type="text" id="txtBsActivity" class="field-input" placeholder=".MainActivity" value="com.yape.activity.MainActivity"/>
+                    </div>
+
+                    <!-- iOS: Bundle ID -->
+                    <div id="bsIosFields" style="display:none">
+                        <label class="field-label" style="margin-top:6px">Bundle ID:</label>
+                        <input type="text" id="txtBsBundleId" class="field-input" value="com.yape.qa" placeholder="com.example.app"/>
+                    </div>
                 </div>
 
                 <div id="lblBsStatus" class="config-status"></div>
@@ -114,7 +133,7 @@
                 </div>
                 <div class="upload-modal-body">
                     <p class="upload-hint">
-                        El APK se sube a tu cuenta de BrowserStack y obtienes el URL <code>bs://...</code>
+                        El APK / IPA se sube a tu cuenta de BrowserStack y obtienes el URL <code>bs://...</code>
                         para usarlo en las sesiones de testing.
                     </p>
 
@@ -125,7 +144,7 @@
                     <div id="uploadDropZone" class="upload-drop-zone">
                         <div class="upload-drop-icon">📦</div>
                         <div class="upload-drop-text">Haz clic para seleccionar el APK</div>
-                        <div class="upload-drop-sub">.apk · .aab · .xapk</div>
+                        <div class="upload-drop-sub">.apk · .aab · .xapk · .ipa</div>
                     </div>
 
                     <div id="uploadProgress" class="upload-progress" style="display:none">

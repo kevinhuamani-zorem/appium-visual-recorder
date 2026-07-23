@@ -18,3 +18,5 @@ giro_retiro_de_efectivo:@://*[@content-desc="Giro/retiro de efectivo"]
 iniciar_sesi_n:@://*[@content-desc="Iniciar sesión"]
 btn_contra:@://android.widget.Button
 ya_tengo_una_cuenta:@://*[@content-desc="Ya tengo una cuenta"]
+correo_electr_nico_campo_de_texto_obligatorio:@://*[@content-desc="Correo electrónico, Campo de texto obligatorio"]
+nueve:@://*[@text="9"]

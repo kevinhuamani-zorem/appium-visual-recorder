@@ -1,34 +1,58 @@
 import { Given, When, Then, Before, After, setDefaultTimeout } from '@cucumber/cucumber';
 import { AppiumDriverManager } from '../../core/appiumDriverManager';
+import { BrowserStackDriverManager } from '../../core/browserStackDriverManager';
 import { LocatorManager } from '../../core/locatorManager';
 import { MobileStepExecutor } from '../../core/mobileStepExecutor';
+import { PageFactory } from '../pageFactory';
 import { RecordedStep } from '../../core/models';
 import assert from 'assert';
 import * as fs from 'fs';
 
-setDefaultTimeout(60 * 1000);
+setDefaultTimeout(120 * 1000);
 
-const dm = new AppiumDriverManager();
+// ─── Configuración de sesión ──────────────────────────────────────────────────
+const SESSION_CONFIG_PATH = './resources/session_config.json';
+
+function loadSessionConfig(): any {
+    try {
+        return JSON.parse(fs.readFileSync(SESSION_CONFIG_PATH, 'utf-8'));
+    } catch {
+        return null;
+    }
+}
+
+// ─── Dependencias compartidas ─────────────────────────────────────────────────
 const lm = new LocatorManager('./resources/locators/recorded.locators');
-let executor: MobileStepExecutor;
+let dm: AppiumDriverManager;
 
 Before(async () => {
-    await dm.init({
-        deviceName:      'SM-A566E',
-        udid:            'R5GL34VQKAX',
-        platformVersion: '16',
-        appPackage:      process.env.APP_PACKAGE || 'com.yape.qa',
-        appActivity:     process.env.APP_ACTIVITY || '.MainActivity',
+    const cfg = loadSessionConfig();
+
+    if (cfg?.type === 'browserstack') {
+        console.log(`[Test] BrowserStack — ${cfg.platform || 'android'} — ${cfg.deviceName}`);
+        dm = new BrowserStackDriverManager();
+    } else {
+        console.log('[Test] Local — dispositivo físico');
+        dm = new AppiumDriverManager();
+    }
+
+    await dm.init(cfg ?? {
+        deviceName:      process.env.DEVICE_NAME      || 'SM-A566E',
+        udid:            process.env.DEVICE_UDID      || 'R5GL34VQKAX',
+        platformVersion: process.env.PLATFORM_VERSION || '16',
+        appPackage:      process.env.APP_PACKAGE      || 'com.yape.qa',
+        appActivity:     process.env.APP_ACTIVITY     || '.MainActivity',
     });
-    executor = new MobileStepExecutor(dm, lm);
+
+    const executor = new MobileStepExecutor(dm, lm);
+    PageFactory.init(dm, executor, lm);
 });
 
 After(async () => {
     await dm.quit();
 });
 
-function step(s: RecordedStep) { return executor.execute(s); }
-
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function resolve(locator: string): string {
     return locator.startsWith('{') ? lm.resolve(locator) : locator;
 }
@@ -38,14 +62,18 @@ async function waitForElement(selector: string, timeoutMs = 15000): Promise<void
     while (Date.now() - start < timeoutMs) {
         try {
             const el = await dm.findElement(selector);
-            const displayed = await el.isDisplayed();
-            if (displayed) return;
+            if (await el.isDisplayed()) return;
         } catch {}
         await new Promise(r => setTimeout(r, 800));
     }
     throw new Error(`Elemento no encontrado despues de ${timeoutMs}ms: ${selector}`);
 }
 
+function step(s: RecordedStep) {
+    return PageFactory.base['executor'].execute(s);
+}
+
+// ─── Steps ───────────────────────────────────────────────────────────────────
 Given('el usuario abre la app {string}', async (pkg: string) => {
     await step({ action: 'ABRIR_APP', value: pkg });
 });
@@ -119,43 +147,6 @@ Then('el elemento {string} es visible', async (locator: string) => {
 });
 
 Then('el elemento {string} no es visible', async (locator: string) => {
-    const sel = resolve(locator);
-    const r = await step({ action: 'VERIFICAR_NO_EXISTE', selector: sel });
+    const r = await step({ action: 'VERIFICAR_NO_EXISTE', selector: resolve(locator) });
     assert.ok(r.success, r.message);
-});
-
-// ── Linked steps (scenario_linked.json) ──────────────────────────────────────
-
-const LINKED_STEPS_PATH = './resources/scenario_linked.json';
-const SKIP_ACTIONS = new Set(['ABRIR_APP']);
-const NEEDS_WAIT = new Set(['CLICK', 'ESCRIBIR', 'LIMPIAR', 'PRESION_LARGA',
-    'SCROLL_HASTA', 'VERIFICAR_TEXTO', 'VERIFICAR_EXISTE', 'VERIFICAR_NO_EXISTE']);
-
-function loadLinkedSteps(): Record<string, RecordedStep[]> {
-    try {
-        return JSON.parse(fs.readFileSync(LINKED_STEPS_PATH, 'utf-8'));
-    } catch {
-        return {};
-    }
-}
-
-const linkedStepsMap = loadLinkedSteps();
-
-Object.entries(linkedStepsMap).forEach(([stepText, steps]) => {
-    Given(stepText, async () => {
-        for (const s of steps) {
-            if (SKIP_ACTIONS.has(s.action)) continue;
-            const resolvedSelector = s.variableName
-                ? lm.resolve(s.variableName)
-                : (s.selector ? resolve(s.selector) : undefined);
-            const normalizedStep = { ...s, selector: resolvedSelector };
-            if (resolvedSelector && NEEDS_WAIT.has(s.action)) {
-                await waitForElement(resolvedSelector);
-            }
-            const r = await executor.execute(normalizedStep);
-            if (r && !r.success) {
-                assert.ok(r.success, r.message);
-            }
-        }
-    });
 });
