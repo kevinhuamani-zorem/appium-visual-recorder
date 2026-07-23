@@ -12,6 +12,7 @@ setDefaultTimeout(120 * 1000);
 
 // ─── Configuración de sesión ──────────────────────────────────────────────────
 const SESSION_CONFIG_PATH = './resources/session_config.json';
+const LOCATOR_ROOT = './resources/locators';
 
 function loadSessionConfig(): any {
     try {
@@ -22,11 +23,25 @@ function loadSessionConfig(): any {
 }
 
 // ─── Dependencias compartidas ─────────────────────────────────────────────────
-const lm = new LocatorManager('./resources/locators/recorded.locators');
+let lm: LocatorManager;
 let dm: AppiumDriverManager;
 
-Before(async () => {
+function locatorModuleForFeature(uri: string | undefined): string {
+    if (!uri) return 'global';
+    try {
+        const source = fs.readFileSync(uri, 'utf-8');
+        const match = source.match(/^\s*#\s*locator-module:\s*([^\s#]+)\s*$/mi);
+        return match?.[1] || 'global';
+    } catch {
+        return 'global';
+    }
+}
+
+Before(async ({ pickle }: any) => {
     const cfg = loadSessionConfig();
+    const platform = cfg?.platform === 'ios' ? 'ios' : 'android';
+    const locatorModule = locatorModuleForFeature(pickle?.uri);
+    lm = new LocatorManager(LOCATOR_ROOT, locatorModule, platform);
 
     if (cfg?.type === 'browserstack') {
         console.log(`[Test] BrowserStack — ${cfg.platform || 'android'} — ${cfg.deviceName}`);

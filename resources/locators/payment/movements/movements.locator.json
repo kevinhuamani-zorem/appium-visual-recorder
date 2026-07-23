@@ -1,0 +1,32 @@
+{
+  "android": {
+    "titleMovements": "android=new UiSelector().text(\"Movimientos\")",
+    "btmclose": "android=new UiSelector().className(\"android.widget.Button\").instance(1)",
+    "btnsendemail": "android=new UiSelector().className(\"android.view.View\").instance(6)",
+    "btnfilter": "android=new UiSelector().className(\"android.view.View\").instance(8)",
+    "btntoday": "android=new UiSelector().className(\"android.view.View\").instance(3)",
+    "btn7days": "android=new UiSelector().className(\"android.view.View\").instance(4)",
+    "btn15days": "android=new UiSelector().className(\"android.view.View\").instance(5)",
+    "btn30days": "android=new UiSelector().className(\"android.view.View\").instance(6)",
+    "btn90days": "android=new UiSelector().className(\"android.view.View\").instance(7)",
+    "txtemail": "class=android.widget.EditText",
+    "btnsend": "android=new UiSelector().text(\"ENVIAR\")",
+    "sendemailmessage": "android=new UiSelector().text(\"Tu correo se estará enviando en los próximos minutos.\")",
+    "btnentendido": "android=new UiSelector().text(\"ENTENDIDO\")"
+  },
+  "ios": {
+    "titleMovements": "~Movimientos",
+    "btmclose": "~cerrar",
+    "btnsendemail": "~Correo electronico",
+    "btnfilter": "~Filtrar",
+    "btntoday": "~Solo hoy",
+    "btn7days": "~Últimos 7 días",
+    "btn15days": "~Últimos 15 días",
+    "btn30days": "~Últimos 30 días",
+    "btn90days": "~Últimos 90 días",
+    "txtemail": "class=XCUIElementTypeTextField",
+    "btnsend": "iosClassChain=**/XCUIElementTypeButton[`name == \"Enviar\"`]",
+    "sendemailmessage": "iosClassChain=**/XCUIElementTypeStaticText[`name == \"Tu correo se estará enviando en los próximos minutos.\"`]",
+    "btnentendido": "~Entendido"
+  }
+}

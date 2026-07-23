@@ -1,0 +1,25 @@
+{
+  "android": {
+    "btn_9": "//android.view.View[./android.widget.TextView[@text='9']]",
+    "intentarlo_despues": "~Intentarlo después",
+    "yapear": "~Yapear",
+    "permitir": "android=new UiSelector().text(\"Permitir\")",
+    "mostrar_saldo": "android=new UiSelector().text(\"Mostrar saldo\")",
+    "entendido": "android=new UiSelector().text(\"ENTENDIDO\")",
+    "nueve": "android=new UiSelector().text(\"9\")",
+    "ver_todo": "~Ver todo",
+    "giro_retiro_de_efectivo": "~Giro/retiro de efectivo",
+    "iniciar_sesion": "~Iniciar sesión",
+    "btn_contra": "class=android.widget.Button",
+    "ya_tengo_una_cuenta": "~Ya tengo una cuenta",
+    "correo_electronico": "~Correo electrónico, Campo de texto obligatorio",
+    "permission_allow_button": "id=com.android.permissioncontroller:id/permission_allow_button",
+    "permission_deny_button": "id=com.android.permissioncontroller:id/permission_deny_button"
+  },
+  "ios": {
+    "allow": "~Allow",
+    "dont_allow": "//XCUIElementTypeButton[@name=\"Don't Allow\" or @label=\"Don't Allow\" or @name=\"Don’t Allow\" or @label=\"Don’t Allow\"]",
+    "ask_app_not_to_track": "~Ask App Not to Track",
+    "m_s_tarde": "~Más tarde"
+  }
+}

@@ -1948,7 +1948,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         const gherkinLines = [
             `# Generado por Appium Visual Recorder`,
             `# Fecha: ${date}`,
-            `# Locators: ./recorded/locators/recorded.locators`,
+            `# locator-module: global`,
+            `# Locators: ./resources/locators/global.locator.json`,
             '',
             `Feature: ${featureName}`,
             '',

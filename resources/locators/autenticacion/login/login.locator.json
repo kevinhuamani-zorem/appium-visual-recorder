@@ -1,0 +1,40 @@
+{
+  "android": {
+    "btnCrearCuenta": "~Crear una cuenta",
+    "btnTengoCuenta": "~Ya tengo una cuenta",
+    "txtEmail": "//android.widget.EditText",
+    "btnContinuar": "android=new UiSelector().text(\"Continuar\")",
+    "lnkHelpCenter": "//android.widget.TextView[@text='Ingresa al Centro de Ayuda']",
+    "lblYapeAccountTitle": "//android.widget.TextView[@text='Ingresa a tu Yape']",
+    "btnTypeNumber": "android=new UiSelector().text(\"{{number}}\")",
+    "txtIngresarOtp": "class=android.widget.EditText",
+    "btnValidarCodigoPhone": "android=new UiSelector().text(\"Validar código\")",
+    "txtOtpDevice": "class=android.widget.EditText",
+    "txtRedirecUnlock": "android=new UiSelector().text(\"¡Todo listo!\")",
+    "btnRedirectUnlock": "android=new UiSelector().text(\"ENTENDIDO\")",
+    "btnEnOtroMomento": "android=new UiSelector().text(\"En otro momento\")",
+    "btnIntentarloDespues": "android=new UiSelector().text(\"Intentarlo después\")",
+    "btnIniciarSesion": "android=new UiSelector().text(\"Iniciar sesión\")",
+    "btnCompartenosTuUbicacion": "id=android:id/button2",
+    "btnContinuarSinDesinstalar": "~Continuar sin desinstalar apps",
+    "btnContinuarBajoRiesgo": "~Continuar bajo mi propio riesgo"
+  },
+  "ios": {
+    "btnCrearCuenta": "iosClassChain=**/XCUIElementTypeButton[`name == 'Crear una cuenta'`]",
+    "btnTengoCuenta": "iosClassChain=**/XCUIElementTypeButton[`name == 'Ya tengo una cuenta'`]",
+    "txtEmail": "//XCUIElementTypeOther[@name=\"Correo electrónico, Campo de texto obligatorio\"]/child::XCUIElementTypeTextField",
+    "btnContinuar": "iosClassChain=**/XCUIElementTypeButton[`name == 'Continuar'`]",
+    "btnTypeNumber": "iosClassChain=**/XCUIElementTypeButton[`name == '{{number}}'`]",
+    "txtIngresarOtp": "~Código de validación",
+    "btnValidarCodigoPhone": "iosClassChain=**/XCUIElementTypeButton[`name == 'Validar código'`]",
+    "txtOtpDevice": "~Código de validación",
+    "txtRedirecUnlock": "iosClassChain=**/XCUIElementTypeStaticText[`name == '¡Todo listo!'`]",
+    "btnRedirectUnlock": "~Entendido",
+    "btnEnOtroMomento": "//XCUIElementTypeButton[contains(@label, 'En otro momento')]",
+    "btnIntentarloDespues": "~Continuar",
+    "btnIniciarSesion": "~Iniciar sesión",
+    "btnCompartenosTuUbicacion": "iosClassChain=**/XCUIElementTypeButton[`name == \"button-accept\"`]",
+    "btnContinuarSinDesinstalar": "iosClassChain=**/XCUIElementTypeButton[`name == \"Continuar sin desinstalar apps\"`]",
+    "btnContinuarBajoRiesgo": "iosClassChain=**/XCUIElementTypeButton[`name == \"Continuar bajo mi propio riesgo\"`]"
+  }
+}

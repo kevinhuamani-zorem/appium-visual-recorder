@@ -28,6 +28,7 @@ export class FeatureGenerator {
         return [
             `# Generado por Appium Visual Recorder`,
             `# Fecha: ${date}`,
+            `# locator-module: global`,
             `# Locators: ${this.locatorsPath}`,
             '',
             `Feature: ${featureName}`,

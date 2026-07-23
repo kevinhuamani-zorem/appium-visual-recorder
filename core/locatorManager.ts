@@ -1,64 +1,109 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SEP = ':@:';
+export type LocatorPlatform = 'android' | 'ios';
 
+type LocatorDocument = Partial<Record<LocatorPlatform, Record<string, string>>>;
+
+/**
+ * Carga locators explícitos desde resources/locators/<módulo>.locator.json.
+ * Los locators del módulo activo prevalecen sobre el módulo global.
+ */
 export class LocatorManager {
-    private locators: Map<string, string> = new Map();
+    private locators = new Map<string, string>();
+    private activeLocators = new Map<string, string>();
 
-    constructor(private filePath: string) {
+    constructor(
+        private readonly rootPath = './resources/locators',
+        private readonly moduleName = 'global',
+        private readonly platform: LocatorPlatform = 'android'
+    ) {
         this.load();
     }
 
     private load(): void {
-        if (!fs.existsSync(this.filePath)) return;
-        const lines = fs.readFileSync(this.filePath, 'utf-8').split('\n');
-        for (const line of lines) {
-            if (line.startsWith('#') || !line.trim()) continue;
-            const [key, ...rest] = line.split(SEP);
-            if (key && rest.length) {
-                this.locators.set(key.trim(), rest.join(SEP).trim());
-            }
+        this.locators.clear();
+        this.mergeModule('global');
+        const active = this.readModule(this.moduleName);
+        this.activeLocators = new Map(Object.entries(active));
+        if (this.moduleName !== 'global') {
+            for (const [name, selector] of Object.entries(active)) this.locators.set(name, selector);
         }
-        console.log(`[LocatorManager] Cargados ${this.locators.size} locators`);
+        console.log(`[LocatorManager] ${this.locators.size} locators — ${this.platform} — ${this.moduleName}`);
     }
 
-    private save(): void {
-        const dir = path.dirname(this.filePath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        const lines = [
-            '# Archivo generado por Appium Visual Recorder',
-            '# formato: nombre_variable:@:selector',
-            '# Selectores soportados:',
-            '#   XPath    : //android.widget.Button[@text="Login"]',
-            '#   Resource : //*[@resource-id="com.app:id/btn_login"]',
-            '#   AccId    : ~accessibility_id',
-            '',
-            ...Array.from(this.locators.entries()).map(([k, v]) => `${k}${SEP}${v}`)
-        ];
-        fs.writeFileSync(this.filePath, lines.join('\n'), 'utf-8');
+    private normalizeModule(moduleName: string): string {
+        const normalized = moduleName.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        if (!normalized || normalized.split('/').some(part => part === '..')) {
+            throw new Error(`Módulo de locators inválido: "${moduleName}"`);
+        }
+        return normalized;
+    }
+
+    private moduleFile(moduleName: string): string {
+        return path.join(this.rootPath, `${this.normalizeModule(moduleName)}.locator.json`);
+    }
+
+    private readModule(moduleName: string): Record<string, string> {
+        const filePath = this.moduleFile(moduleName);
+        if (!fs.existsSync(filePath)) {
+            if (moduleName === 'global') return {};
+            throw new Error(`No existe el módulo de locators: ${filePath}`);
+        }
+        const document = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as LocatorDocument;
+        const locators = document[this.platform] || {};
+        for (const [name, selector] of Object.entries(locators)) {
+            if (typeof selector !== 'string' || !selector.trim()) {
+                throw new Error(`Locator inválido: ${moduleName}.${name}`);
+            }
+        }
+        return locators;
+    }
+
+    private mergeModule(moduleName: string): void {
+        for (const [name, selector] of Object.entries(this.readModule(moduleName))) {
+            this.locators.set(name, selector);
+        }
+    }
+
+    private saveActiveModule(): void {
+        const filePath = this.moduleFile(this.moduleName);
+        const dir = path.dirname(filePath);
+        fs.mkdirSync(dir, { recursive: true });
+        let document: LocatorDocument = {};
+        if (fs.existsSync(filePath)) document = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as LocatorDocument;
+        document[this.platform] = Object.fromEntries(this.activeLocators);
+        fs.writeFileSync(filePath, JSON.stringify(document, null, 2) + '\n', 'utf-8');
     }
 
     add(name: string, selector: string): void {
+        if (!name || !selector) throw new Error('Nombre y selector son obligatorios');
+        this.activeLocators.set(name, selector);
         this.locators.set(name, selector);
-        this.save();
-        console.log(`[LocatorManager] Guardado: ${name}${SEP}${selector}`);
+        this.saveActiveModule();
+        console.log(`[LocatorManager] Guardado: ${this.moduleName}.${name} → ${selector}`);
     }
 
     resolve(variable: string): string {
         const key = variable.replace(/[{}]/g, '');
-        return this.locators.get(key) || variable;
+        const separator = key.lastIndexOf('.');
+        if (separator > 0) {
+            const moduleName = key.slice(0, separator).replace(/\./g, '/');
+            const locatorName = key.slice(separator + 1);
+            const selector = this.readModule(moduleName)[locatorName] || this.readModule('global')[locatorName];
+            if (selector) return selector;
+            throw new Error(`Locator no encontrado: ${key} (${this.platform})`);
+        }
+        const selector = this.locators.get(key);
+        if (!selector) throw new Error(`Locator no encontrado: ${this.moduleName}.${key} (${this.platform})`);
+        return selector;
     }
 
     exists(name: string): boolean {
-        return this.locators.has(name);
+        try { this.resolve(name); return true; } catch { return false; }
     }
 
-    getAll(): Record<string, string> {
-        return Object.fromEntries(this.locators);
-    }
-
-    getFilePath(): string {
-        return this.filePath;
-    }
+    getAll(): Record<string, string> { return Object.fromEntries(this.locators); }
+    getFilePath(): string { return this.moduleFile(this.moduleName); }
+    getModuleName(): string { return this.moduleName; }
 }

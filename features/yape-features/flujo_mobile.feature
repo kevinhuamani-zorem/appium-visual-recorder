@@ -1,6 +1,7 @@
 # Generado por Appium Visual Recorder
 # Fecha: 23/6/2026, 10:18:34
-# Locators: ./resources/locators/recorded.locators
+# locator-module: global
+# Locators: ./resources/locators/global.locator.json
 
 Feature: Flujo mobile
 

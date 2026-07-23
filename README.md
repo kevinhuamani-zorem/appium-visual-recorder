@@ -122,7 +122,15 @@ El script automaticamente:
 ## Archivos generados
 
     automation/features/yape-features/<nombre>.feature  Escenario Gherkin ejecutable
-    resources/locators/recorded.locators                Variables de selectores
+    resources/locators/global.locator.json               Locators globales por plataforma
+
+Los features pueden declarar un módulo de locators; si no lo hacen se usa `global`:
+
+    # locator-module: autenticacion/login/login
+
+Cada archivo `*.locator.json` contiene bloques `android` e `ios`. Los selectores
+deben indicar su estrategia explícitamente, por ejemplo `~Allow`,
+`id=com.app:id/btn_login`, `android=new UiSelector()...` o `iosClassChain=...`.
 
     Formato .locators:
     nombre_variable:@:selector
@@ -217,4 +225,3 @@ El reporte HTML se genera en:
     - El XML Hierarchy Viewer es la forma mas confiable de capturar selectores
     - Los selectores por resource-id son los mas estables para automatizacion
     - Los selectores por text pueden fallar si el texto cambia por idioma
-

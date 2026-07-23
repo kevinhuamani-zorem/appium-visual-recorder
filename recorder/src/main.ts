@@ -19,9 +19,9 @@ let mainWindow: BrowserWindow | null = null;
 
 const dm             = new AppiumDriverManager();
 const bsDm           = new BrowserStackDriverManager();
-const locatorManager = new LocatorManager('./resources/locators/recorded.locators');
+let locatorManager   = new LocatorManager('./resources/locators', 'global', 'android');
 // Debe coincidir con cucumber.json para que los escenarios generados se ejecuten.
-const featureGen     = new FeatureGenerator('./automation/features/yape-features', './resources/locators/recorded.locators');
+const featureGen     = new FeatureGenerator('./automation/features/yape-features', './resources/locators/global.locator.json');
 
 // Apunta al manager activo (local o BrowserStack)
 let activeDm: AppiumDriverManager = dm;
@@ -101,6 +101,7 @@ ipcMain.handle('start-session', async (_, config: any) => {
         activeDm = dm;
         await dm.startAppiumServer();
         await dm.init(config);
+        locatorManager = new LocatorManager('./resources/locators', 'global', 'android');
         inspector  = new MobileInspector(activeDm);
         executor   = new MobileStepExecutor(activeDm, locatorManager);
         sessionActive = true;
@@ -370,6 +371,7 @@ ipcMain.handle('bs-start-session', async (_, config: BrowserStackConfig) => {
     try {
         activeDm = bsDm;
         await bsDm.init(config);
+        locatorManager = new LocatorManager('./resources/locators', 'global', config.platform === 'ios' ? 'ios' : 'android');
         inspector  = new MobileInspector(activeDm);
         executor   = new MobileStepExecutor(activeDm, locatorManager);
         sessionActive = true;
@@ -555,7 +557,8 @@ ipcMain.handle('generate-linked-files', async (_, featureName: string, scenarioN
         const featureLines = [
             `# Generado por Appium Visual Recorder`,
             `# Fecha: ${date}`,
-            `# Locators: ./resources/locators/recorded.locators`,
+            `# locator-module: global`,
+            `# Locators: ./resources/locators/global.locator.json`,
             '',
             `Feature: ${featureName}`,
             '',
